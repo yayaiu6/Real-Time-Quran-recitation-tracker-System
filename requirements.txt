@@ -1,0 +1,11 @@
+Flask==3.1.1
+Flask-SocketIO==5.5.1
+flask-cors==6.0.1
+Flask-Compress==1.15
+groq==0.31.0
+ffmpeg-python==0.2.0
+python-Levenshtein==0.27.1
+gunicorn
+eventlet==0.33.3
+flask_compress
+python-dotenv==1.0.1
