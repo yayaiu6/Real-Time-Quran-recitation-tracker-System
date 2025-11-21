@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Quran recitation tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Real-Time Quran recitation tracker</h1>
+            <p>تسميع القرآن الكريم بالذكاء الاصطناعي</p>
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-input" placeholder="ابحث في القرآن...">
+            <div id="searchResults" class="search-results" style="display: none;"></div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="suraSelect">السورة:</label>
+                <select id="suraSelect">
+                    <option value="">اختر السورة</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="pageSelect">الصفحة:</label>
+                <select id="pageSelect">
+                    <option value="1">الصفحة 1</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="juzSelect">الجزء:</label>
+                <select id="juzSelect">
+                    <option value="">اختر الجزء</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <button id="startRecitationBtn" class="nav-btn">ابدأ التسميع</button>
+                <button id="stopRecitationBtn" class="nav-btn" style="display: none;">إيقاف التسميع</button>
+            </div>
+        </div>
+
+        <div class="navigation">
+            <button id="prevBtn" class="nav-btn">الصفحة السابقة</button>
+            <button id="nextBtn" class="nav-btn">الصفحة التالية</button>
+        </div>
+
+        <div class="page-info" id="pageInfo">جاري التحميل...</div>
+        <div class="mushaf-page" id="mushafPage">
+            <div class="loading">جاري تحميل القرآن الكريم...</div>
+        </div>
+
+        <div class="navigation">
+            <button id="prevBtnBottom" class="nav-btn">الصفحة السابقة</button>
+            <button id="nextBtnBottom" class="nav-btn">الصفحة التالية</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="core.js"></script>
+    <script src="AI_integration.js"></script>
+</body>
+</html>
