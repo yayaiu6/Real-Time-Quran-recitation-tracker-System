@@ -9,7 +9,9 @@ python-dotenv==1.0.1
 # ASR Backend Dependencies
 groq==0.31.0
 # For NVIDIA NeMo (local): install the following
-torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+torch --index-url https://download.pytorch.org/whl/cu118
+torchvision --index-url https://download.pytorch.org/whl/cu118
+torchaudio --index-url https://download.pytorch.org/whl/cu118
 nemo-toolkit[asr]>=1.20.0
 librosa>=0.10.0
 soundfile>=0.12.0
