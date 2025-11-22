@@ -12,11 +12,11 @@ from flask import Flask, jsonify, send_from_directory, request as flask_request
 from flask_compress import Compress
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
-from groq import Groq
 
 from quran_alignment import AlignmentConfig, QuranAlignmentEngine, normalize_text
 from session_manager import SessionManager
 import config as app_config
+import asr_backend
 
 # Setup logging
 logging.basicConfig(level=getattr(logging, app_config.LOG_LEVEL), format='%(asctime)s %(levelname)s: %(message)s')
@@ -47,13 +47,6 @@ performance_metrics = {
     'alignment_times': [],
     'total_chunks_processed': 0
 }
-
-def get_groq_client() -> Groq:
-    """Create a Groq client using the configured environment API key."""
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError("Missing Groq API key. Set GROQ_API_KEY in your environment or .env file.")
-    return Groq(api_key=api_key)
 
 # Load Quran data and build indexes
 with open('assets/hafs_smart_v8.json', 'r', encoding='utf-8') as file:
@@ -141,8 +134,21 @@ logging.info(f"Alignment engine ready. Total words indexed: {len(alignment_engin
 # Initialize session manager
 session_manager = SessionManager(
     confidence_threshold=alignment_config.CONFIDENCE_THRESHOLD,
-    max_low_confidence=app_config.MAX_LOW_CONFIDENCE_CHUNKS
+    max_low_confidence=app_config.MAX_LOW_CONFIDENCE_CHUNKS,
+    audio_buffer_max_duration=app_config.AUDIO_BUFFER_MAX_DURATION
 )
+
+# Initialize and deploy ASR backend
+logging.info("Initializing ASR backend...")
+try:
+    asr_backend.initialize_backend()
+    asr_info = asr_backend.get_backend_info()
+    logging.info(f"✓ ASR Backend ready: {asr_info['backend']} ({asr_info['type']})")
+    if 'device' in asr_info:
+        logging.info(f"  Device: {asr_info['device']}")
+except Exception as e:
+    logging.error(f"✗ Failed to initialize ASR backend: {e}")
+    logging.error("  Application may not work correctly. Please check configuration.")
 
 @app.route('/')
 def serve_index():
@@ -323,25 +329,37 @@ def handle_audio_chunk(data):
             emit('word_result', {'error': f"Audio conversion failed: {e.stderr.decode()}"})
             return
 
-        # Transcribe with Whisper (timed)
-        transcription_start = time.time()
-        logging.info(f"[{sid[:8]}] Sending to Whisper API...")
-        try:
-            groq_client = get_groq_client()
-        except RuntimeError as e:
-            logging.error(f"[{sid[:8]}] {e}")
-            emit('word_result', {'error': 'no_api_key', 'message': 'no_api_key'})
-            return
+        # Add current chunk to cumulative audio buffer (sliding window)
+        current_wav_bytes = wav_buffer.getvalue()
+        chunk_duration = 2.0  # Approximate duration per chunk
+        session_manager.add_audio_to_buffer(sid, current_wav_bytes, chunk_duration)
+        
+        # Get cumulative audio for transcription (sliding window approach)
+        cumulative_wav = session_manager.get_cumulative_audio(sid)
+        buffer_duration = session_manager.get_session(sid).audio_buffer_duration
+        logging.info(f"[{sid[:8]}] Cumulative buffer: {buffer_duration:.1f}s, {len(cumulative_wav)} bytes")
 
-        transcription = groq_client.audio.transcriptions.create(
-            file=("audio.wav", wav_buffer),
-            model="whisper-large-v3-turbo",
-            language="ar"
-        ).text
+        # Transcribe with configured ASR backend (timed)
+        transcription_start = time.time()
+        backend_info = asr_backend.get_backend_info()
+        logging.info(f"[{sid[:8]}] Transcribing with ASR backend: {backend_info['backend']}...")
+        
+        try:
+            # Transcribe cumulative audio (sliding window)
+            transcription = asr_backend.transcribe_audio(cumulative_wav)
+        except RuntimeError as e:
+            logging.error(f"[{sid[:8]}] ASR backend error: {e}")
+            emit('word_result', {'error': 'asr_error', 'message': str(e)})
+            return
+        except Exception as e:
+            logging.error(f"[{sid[:8]}] Transcription failed: {e}")
+            emit('word_result', {'error': 'transcription_failed', 'message': str(e)})
+            return
+        
         transcription_time = time.time() - transcription_start
         performance_metrics['transcription_times'].append(transcription_time)
         
-        logging.info(f"[{sid[:8]}] Whisper output: {transcription} (took {transcription_time:.3f}s)")
+        logging.info(f"[{sid[:8]}] ASR output: {transcription} (took {transcription_time:.3f}s)")
 
         # Validate transcription
         if not transcription.strip():

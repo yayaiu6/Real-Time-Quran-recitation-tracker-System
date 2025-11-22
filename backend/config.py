@@ -47,6 +47,23 @@ MIN_AUDIO_ENERGY = 0.01  # Minimum audio energy (lower = silence)
                          # 0.02  = strict
 
 # ==============================================================================
+# ASR Backend Settings
+# ==============================================================================
+
+# ASR Backend Selection
+ASR_BACKEND = "nemo"  # Options: "whisper" (Groq cloud API) or "nemo" (local NVIDIA NeMo)
+                         # - "whisper": Uses Groq Whisper API (requires GROQ_API_KEY in .env)
+                         # - "nemo": Uses local NVIDIA NeMo model (requires GPU with CUDA for best performance)
+
+# NeMo Model Settings (only used when ASR_BACKEND = "nemo")
+NEMO_MODEL_PATH = "arabic-asr/conformer_ctc_small_60e_adamw_30wtr_32wv_40wte.nemo"  # Path to NeMo model file
+
+# Audio Buffer Settings (Cumulative Transcription)
+AUDIO_BUFFER_MAX_DURATION = 8.0  # Maximum audio buffer duration in seconds (sliding window)
+                                  # Higher values = more context for ASR but slower processing
+                                  # Recommended: 6-10 seconds
+
+# ==============================================================================
 # Logging Settings
 # ==============================================================================
 
@@ -83,5 +100,14 @@ If results show:
 6. Processing is slow:
    - Reduce TRACKING_WINDOW_SIZE to 40
    - Reduce MAX_SEGMENT_WORDS to 20
+
+7. Want to use local ASR instead of cloud API:
+   - Change ASR_BACKEND to "nemo"
+   - Ensure NEMO_MODEL_PATH points to valid .nemo model file
+   - GPU with CUDA highly recommended for real-time performance
+
+8. NeMo ASR is slow:
+   - Ensure CUDA is available (check logs for "Model loaded on CUDA")
+   - If running on CPU, consider switching back to "whisper" for better latency
 """
 
