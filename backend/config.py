@@ -7,7 +7,7 @@ Configuration file for tunable parameters
 # ==============================================================================
 
 # Similarity Thresholds
-WORD_SIMILARITY_THRESHOLD = 0.45  # Minimum threshold to consider a word correct (0.7-0.85 recommended)
+WORD_SIMILARITY_THRESHOLD = 0.7  # Minimum threshold to consider a word correct (0.7-0.85 recommended)
 SEGMENT_SCORE_THRESHOLD = 0.5     # Minimum threshold to accept a candidate segment (0.4-0.6 recommended)
 
 # Scoring Weights
@@ -32,7 +32,7 @@ SEGMENT_STRIDE = 3      # Overlap between consecutive segments
 # ==============================================================================
 
 # Confidence & Tracking
-CONFIDENCE_THRESHOLD = 0.4  # Minimum confidence before switching to search mode
+CONFIDENCE_THRESHOLD = 0.3  # Minimum confidence before switching to search mode
 MAX_LOW_CONFIDENCE_CHUNKS = 3  # Number of low confidence chunks before switching to search
 
 # ==============================================================================

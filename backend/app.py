@@ -5,14 +5,12 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, cast
-
 import ffmpeg
 from dotenv import load_dotenv
 from flask import Flask, jsonify, send_from_directory, request as flask_request
 from flask_compress import Compress
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
-
 from quran_alignment import AlignmentConfig, QuranAlignmentEngine, normalize_text
 from session_manager import SessionManager
 import config as app_config

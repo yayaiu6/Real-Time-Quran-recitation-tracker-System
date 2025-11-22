@@ -4,6 +4,48 @@ let isReciting = false;
 let currentAyaIndex = 0;
 let audioChunks = [];
 let lastRevealedGlobalIndex = -1; // Last word revealed in the current page
+let currentPageSecondLastAyaId = null; // ID of the second-to-last aya on current page
+let secondLastAyaCompleted = false; // Flag to prevent showing button multiple times
+let currentPageData = null; // Store current page data for reference
+
+// Handle continue to next page button
+async function continueToNextPage() {
+    console.log('Continue to next page clicked');
+    
+    // Hide the button
+    const continueBtn = document.getElementById('continueNextPageBtn');
+    if (continueBtn) {
+        continueBtn.style.display = 'none';
+    }
+    
+    // Check if there's a next page
+    if (currentPage >= totalPages) {
+        console.log('Already on last page');
+        stopRecitation();
+        return;
+    }
+    
+    // Stop current recitation
+    stopRecitation();
+    
+    // Wait a moment for cleanup
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Move to next page
+    const nextPage = currentPage + 1;
+    console.log(`Loading page ${nextPage}...`);
+    await displayPage(nextPage);
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Wait a moment for page to render
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Start recitation on new page
+    console.log('Starting recitation on new page...');
+    await startRecitation();
+}
 
 // Start recitation
 async function startRecitation() {
@@ -11,6 +53,13 @@ async function startRecitation() {
     isReciting = true;
     audioChunks = [];
     lastRevealedGlobalIndex = -1; // Reset counter
+    secondLastAyaCompleted = false; // Reset completion flag
+    
+    // Hide continue button if visible
+    const continueBtn = document.getElementById('continueNextPageBtn');
+    if (continueBtn) {
+        continueBtn.style.display = 'none';
+    }
 
     // Request microphone permission
     try {
@@ -137,6 +186,40 @@ function revealWordsUpTo(globalIndex) {
     });
 }
 
+// Check if second-to-last aya of the page is completed
+function checkSecondLastAyaCompletion() {
+    if (!isReciting || secondLastAyaCompleted || !currentPageSecondLastAyaId) {
+        return;
+    }
+    
+    // Get all words of the second-to-last aya
+    const secondLastAyaWords = document.querySelectorAll(`.quran-word[data-aya-id="${currentPageSecondLastAyaId}"]`);
+    if (secondLastAyaWords.length === 0) {
+        return;
+    }
+    
+    // Check if all words of second-to-last aya are revealed (not hidden)
+    let allRevealed = true;
+    secondLastAyaWords.forEach(word => {
+        if (word.classList.contains('hidden-word')) {
+            allRevealed = false;
+        }
+    });
+    
+    // If all words of second-to-last aya are revealed, show continue button
+    if (allRevealed) {
+        secondLastAyaCompleted = true;
+        const continueBtn = document.getElementById('continueNextPageBtn');
+        if (continueBtn && currentPage < totalPages) {
+            continueBtn.style.display = 'inline-block';
+            console.log('Second-to-last aya completed, showing continue button');
+        } else if (currentPage >= totalPages) {
+            // Last page, just log
+            console.log('Last page reached, no more pages to continue');
+        }
+    }
+}
+
 // Update word state in the interface (new system)
 function updateWordStyle(data) {
     const ayaSpans = document.querySelectorAll(`.quran-word[data-aya-id="${data.aya_id}"][data-word-index="${data.word_index}"]`);
@@ -153,6 +236,9 @@ function updateWordStyle(data) {
         }
         // Incorrect words: do nothing (remain hidden)
     });
+    
+    // Check if second-to-last aya is completed after each word update
+    checkSecondLastAyaCompletion();
 }
 
 // Event listeners
@@ -166,9 +252,36 @@ document.getElementById('startRecitationBtn').addEventListener('click', () => {
 
 document.getElementById('stopRecitationBtn').addEventListener('click', stopRecitation);
 
+document.getElementById('continueNextPageBtn').addEventListener('click', continueToNextPage);
+
 // Modify verse display to support word wrapping with global indexing
 const originalRenderPage = renderPage;
 renderPage = function(pageData) {
+    // Store current page data
+    currentPageData = pageData;
+    
+    // Store second-to-last aya ID for completion check
+    if (pageData && pageData.length >= 2) {
+        // Get the second-to-last aya (index: length - 2)
+        currentPageSecondLastAyaId = pageData[pageData.length - 2].id;
+        console.log(`Second-to-last aya ID: ${currentPageSecondLastAyaId}`);
+    } else if (pageData && pageData.length === 1) {
+        // If only one aya on page, use it
+        currentPageSecondLastAyaId = pageData[0].id;
+        console.log(`Only one aya on page, using it: ${currentPageSecondLastAyaId}`);
+    } else {
+        currentPageSecondLastAyaId = null;
+    }
+    
+    // Reset completion flag when page changes
+    secondLastAyaCompleted = false;
+    
+    // Hide continue button when page changes
+    const continueBtn = document.getElementById('continueNextPageBtn');
+    if (continueBtn) {
+        continueBtn.style.display = 'none';
+    }
+    
     // If page changed during recitation, reset counter
     if (isReciting) {
         lastRevealedGlobalIndex = -1;
