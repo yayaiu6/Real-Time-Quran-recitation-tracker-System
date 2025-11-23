@@ -43,38 +43,6 @@ SEQUENCE_MIN_SEGMENT_SCORE = 0.4  # الحد الأدنى لدرجة المقط�
 SEQUENCE_ALERT_MIN_CONFIDENCE = 0.5  # الحد الأدنى للثقة لإصدار تنبيه
 ```
 
-#### التعديلات على `backend/app.py`
-- تهيئة `SequenceAnalyzer` عند بدء التشغيل
-- إضافة تحليل التسلسل في `handle_audio_chunk` قبل تحديث حالة الجلسة
-- إرسال حدث `sequence_error` عبر Socket.IO عند اكتشاف خطأ
-
-### 2. Frontend Components
-
-#### التعديلات على `frontend/AI_integration.js`
-
-**متغيرات جديدة:**
-- `sequenceErrorsCount`: عداد أخطاء التسلسل
-
-**دوال جديدة:**
-- `handleSequenceError(data)`: معالج رئيسي لأخطاء التسلسل
-- `showSequenceErrorMessage(message, severity)`: عرض رسالة الخطأ
-- `clearSequenceErrorDisplay()`: مسح جميع التنبيهات
-
-**مستمع Socket.IO جديد:**
-```javascript
-socket.on('sequence_error', (data) => {
-    handleSequenceError(data);
-});
-```
-
-#### التعديلات على `frontend/style.css`
-
-**أنماط جديدة:**
-- `.sequence-error-container`: حاوية رسائل الأخطاء
-- `.sequence-error-message`: رسالة الخطأ (warning/error)
-- `.sequence-warning`: تلوين الكلمات المتخطّاة باللون الأصفر
-- `@keyframes slideDown`: تأثير انزلاق الرسالة
-- `@keyframes pulseWarning`: تأثير نبض للكلمات المحذرة
 
 ## كيف يعمل النظام؟
 
