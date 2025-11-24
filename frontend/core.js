@@ -5,9 +5,9 @@ let totalPages = 1;
 let currentSura = null;
 
 // Cache for loaded pages and metadata
-let pageCache = new Map();  // page_number -> page_data
+let pageCache = new Map(); 
 let metadata = null;
-const MAX_CACHE_SIZE = 10;  // Keep last 10 pages in cache
+const MAX_CACHE_SIZE = 10; 
 
 // Juz names
 const juzNames = {
@@ -22,7 +22,7 @@ const juzNames = {
     30: 'الجزء الثلاثون'
 };
 
-// Load metadata only (lightweight)
+
 async function loadMetadata() {
     try {
         const response = await fetch('/quran-data/metadata');
@@ -45,7 +45,6 @@ async function loadMetadata() {
 
 // Load specific page data
 async function loadPageData(pageNum) {
-    // Check cache first
     if (pageCache.has(pageNum)) {
         console.log(`تحميل الصفحة ${pageNum} من الذاكرة المؤقتة`);
         return pageCache.get(pageNum);
@@ -64,7 +63,7 @@ async function loadPageData(pageNum) {
         // Add to cache
         pageCache.set(pageNum, pageData);
         
-        // Limit cache size (LRU-style)
+
         if (pageCache.size > MAX_CACHE_SIZE) {
             const firstKey = pageCache.keys().next().value;
             pageCache.delete(firstKey);
@@ -82,7 +81,7 @@ async function loadPageData(pageNum) {
 async function loadQuranData() {
     try {
         await loadMetadata();
-        // Don't load all data, just metadata
+
         console.log('تم تحميل البيانات الأساسية بنجاح');
     } catch (error) {
         console.error('خطأ في تحميل بيانات القرآن:', error);
@@ -100,7 +99,7 @@ async function loadQuranData() {
 
 // Initialize app
 async function initApp() {
-    // Display loading message
+
     document.getElementById('mushafPage').innerHTML = `
         <div class="loading">
             <div style="margin-bottom: 15px;">جاري تحميل القرآن الكريم...</div>
@@ -211,8 +210,7 @@ function setupEventListeners() {
     document.getElementById('juzSelect').addEventListener('change', async (e) => {
         if (e.target.value) {
             const juzNo = parseInt(e.target.value);
-            // Find first page of this juz by checking metadata
-            // Juz 1 starts at page 1, approximately 20 pages per juz
+
             const estimatedPage = (juzNo - 1) * 20 + 1;
             displayPage(Math.max(1, Math.min(estimatedPage, totalPages)));
         }
@@ -339,7 +337,7 @@ function renderPage(pageData) {
     if (continuousText) {
         html += `<div class="quran-text">${continuousText}</div>`;
     }
-    // Add page information
+
     const firstAya = pageData[0];
     const lastAya = pageData[pageData.length - 1];
     if (firstAya && lastAya) {
@@ -416,8 +414,7 @@ async function search(query) {
 // Navigate to a specific verse
 async function goToAya(ayaId) {
     try {
-        // We need to find which page this aya is on
-        // Try to get from cache first, or fetch the page
+
         let foundPage = null;
         
         // Check cached pages
@@ -428,8 +425,7 @@ async function goToAya(ayaId) {
             }
         }
         
-        // If not in cache, we need to search or estimate
-        // For now, we'll fetch from search result which has page info
+
         if (!foundPage) {
             const response = await fetch(`/quran-data/search?q=&limit=10000`);
             const data = await response.json();
@@ -453,3 +449,4 @@ async function goToAya(ayaId) {
 
 // Start app
 initApp();
+
