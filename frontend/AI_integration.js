@@ -3,33 +3,33 @@ let socket = null;
 let isReciting = false;
 let currentAyaIndex = 0;
 let audioChunks = [];
-let lastRevealedGlobalIndex = -1; // Last word revealed in the current page
-let currentPageSecondLastAyaId = null; // ID of the second-to-last aya on current page
-let secondLastAyaCompleted = false; // Flag to prevent showing button multiple times
-let currentPageData = null; // Store current page data for reference
-let sequenceErrorsCount = 0; // Track number of sequence errors in current session
+let lastRevealedGlobalIndex = -1; 
+let currentPageSecondLastAyaId = null; 
+let secondLastAyaCompleted = false; 
+let currentPageData = null; 
+let sequenceErrorsCount = 0; 
 
-// Handle continue to next page button
+
 async function continueToNextPage() {
     console.log('Continue to next page clicked');
     
-    // Hide the button
+   
     const continueBtn = document.getElementById('continueNextPageBtn');
     if (continueBtn) {
         continueBtn.style.display = 'none';
     }
     
-    // Check if there's a next page
+  
     if (currentPage >= totalPages) {
         console.log('Already on last page');
         stopRecitation();
         return;
     }
     
-    // Stop current recitation
+
     stopRecitation();
     
-    // Wait a moment for cleanup
+
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // Move to next page
@@ -53,8 +53,8 @@ async function startRecitation() {
     if (isReciting) return;
     isReciting = true;
     audioChunks = [];
-    lastRevealedGlobalIndex = -1; // Reset counter
-    secondLastAyaCompleted = false; // Reset completion flag
+    lastRevealedGlobalIndex = -1; /
+    secondLastAyaCompleted = false; 
     
     // Hide continue button if visible
     const continueBtn = document.getElementById('continueNextPageBtn');
@@ -224,7 +224,6 @@ function checkSecondLastAyaCompletion() {
             continueBtn.style.display = 'inline-block';
             console.log('Second-to-last aya completed, showing continue button');
         } else if (currentPage >= totalPages) {
-            // Last page, just log
             console.log('Last page reached, no more pages to continue');
         }
     }
@@ -238,13 +237,12 @@ function updateWordStyle(data) {
         const globalIndex = parseInt(span.getAttribute('data-global-word-index'));
         
         if (data.is_correct) {
-            // Correct word: reveal all words from the beginning up to this word
             if (globalIndex > lastRevealedGlobalIndex) {
                 lastRevealedGlobalIndex = globalIndex;
                 revealWordsUpTo(globalIndex);
             }
         }
-        // Incorrect words: do nothing (remain hidden)
+
     });
     
     // Check if second-to-last aya is completed after each word update
@@ -314,11 +312,9 @@ renderPage = function(pageData) {
     
     // Store second-to-last aya ID for completion check
     if (pageData && pageData.length >= 2) {
-        // Get the second-to-last aya (index: length - 2)
         currentPageSecondLastAyaId = pageData[pageData.length - 2].id;
         console.log(`Second-to-last aya ID: ${currentPageSecondLastAyaId}`);
     } else if (pageData && pageData.length === 1) {
-        // If only one aya on page, use it
         currentPageSecondLastAyaId = pageData[0].id;
         console.log(`Only one aya on page, using it: ${currentPageSecondLastAyaId}`);
     } else {
