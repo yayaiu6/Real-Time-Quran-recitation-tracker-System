@@ -31,7 +31,12 @@ The system now includes an advanced **sequence monitoring** capability that:
 See [SEQUENCE_DETECTION.md](SEQUENCE_DETECTION.md) for detailed documentation.
 
 ---
-<video src="demo.mp4"></video>
+<div align="center">
+  <a href="https://youtu.be/QQmGZw-mYtY?si=LSU28nQLNWgKTEOu">
+    <img src="https://img.youtube.com/vi/QQmGZw-mYtY/0.jpg" width="700" height="450" alt="Watch Demo Video">
+  </a>
+</div>
+
 ##  Background
 
 ### Inspiration from Tarteel AI Research
