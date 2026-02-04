@@ -179,44 +179,106 @@ def _convert_wav_to_16k(wav_bytes: bytes, sr: int = 16000) -> str:
 def nemo_transcribe_wav_bytes(wav_bytes: bytes) -> str:
     """
     Transcribe audio using local NeMo ASR model
-    
+
     Args:
         wav_bytes: WAV audio data as bytes
-    
+
     Returns:
         Transcribed text in Arabic
     """
     import torch
-    
+    import librosa
+
     temp_path = None
     try:
         model = _load_nemo_model()
-        
+
         # Convert to 16kHz if needed
         temp_path = _convert_wav_to_16k(wav_bytes, sr=16000)
-        
+
+        # Load audio directly with librosa to bypass Lhotse dataloader issues
+        audio_signal, _ = librosa.load(temp_path, sr=16000)
+        audio_signal = torch.tensor(audio_signal, dtype=torch.float32).unsqueeze(0)
+        audio_length = torch.tensor([audio_signal.shape[1]], dtype=torch.int64)
+
+        # Move to same device as model
+        device = next(model.parameters()).device
+        audio_signal = audio_signal.to(device)
+        audio_length = audio_length.to(device)
+
         # Run inference with no_grad for efficiency
         with torch.no_grad():
-            try:
-                # Try both parameter names for compatibility with different NeMo versions
-                predictions = model.transcribe(paths2audio_files=[temp_path]) # pyright: ignore[reportCallIssue]
-            except TypeError:
-                predictions = model.transcribe(audio=[temp_path])
-        
-        # Extract text from result
-        if predictions and len(predictions) > 0:
-            first_pred = predictions[0]
-            if hasattr(first_pred, 'text'):
-                transcription = first_pred.text # type: ignore
-            elif isinstance(first_pred, str):
-                transcription = first_pred
+            # Get log probabilities from the model
+            log_probs, encoded_len, predictions = model.forward(
+                input_signal=audio_signal,
+                input_signal_length=audio_length
+            )
+
+            # Decode using the model's decoding strategy
+            if hasattr(model, 'decoding') and model.decoding is not None:
+                # Use model's built-in CTC decoding
+                result = model.decoding.ctc_decoder_predictions_tensor(
+                    log_probs,
+                    decoder_lengths=encoded_len,
+                    return_hypotheses=False
+                )
+                # Handle both old (tuple) and new (single value) return formats
+                hypotheses = result[0] if isinstance(result, tuple) else result
+                if hypotheses:
+                    hyp = hypotheses[0]
+                    # Extract text from Hypothesis object or string
+                    if hasattr(hyp, 'text'):
+                        transcription = hyp.text
+                    elif isinstance(hyp, str):
+                        transcription = hyp
+                    else:
+                        transcription = str(hyp)
+                else:
+                    transcription = ""
+            elif hasattr(model, 'wer') and model.wer is not None:
+                # Alternative: use WER metric's decoding
+                result = model.wer.decoding.ctc_decoder_predictions_tensor(
+                    log_probs,
+                    decoder_lengths=encoded_len,
+                    return_hypotheses=False
+                )
+                hypotheses = result[0] if isinstance(result, tuple) else result
+                if hypotheses:
+                    hyp = hypotheses[0]
+                    if hasattr(hyp, 'text'):
+                        transcription = hyp.text
+                    elif isinstance(hyp, str):
+                        transcription = hyp
+                    else:
+                        transcription = str(hyp)
+                else:
+                    transcription = ""
             else:
-                transcription = str(first_pred)
-        else:
-            transcription = ""
-        
-        return transcription # type: ignore
-        
+                # Fallback: manual greedy CTC decoding
+                greedy_predictions = log_probs.argmax(dim=-1)[0].cpu().tolist()
+
+                # Get blank ID (usually last token in vocab)
+                if hasattr(model, 'decoder'):
+                    blank_id = model.decoder.num_classes_with_blank - 1
+                else:
+                    blank_id = log_probs.shape[-1] - 1
+
+                # Remove blanks and consecutive duplicates
+                decoded_tokens = []
+                prev_token = -1
+                for token in greedy_predictions:
+                    if token != blank_id and token != prev_token:
+                        decoded_tokens.append(token)
+                    prev_token = token
+
+                # Convert token IDs to text using tokenizer
+                if hasattr(model, 'tokenizer') and model.tokenizer is not None:
+                    transcription = model.tokenizer.ids_to_text(decoded_tokens)
+                else:
+                    transcription = ""
+
+        return transcription
+
     except Exception as e:
         logging.error(f"NeMo transcription error: {e}")
         raise
@@ -329,4 +391,3 @@ def get_backend_info() -> dict:
             info["device"] = "cuda" if torch.cuda.is_available() else "cpu"
     
     return info
-
