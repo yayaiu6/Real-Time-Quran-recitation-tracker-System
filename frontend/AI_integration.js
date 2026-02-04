@@ -14,7 +14,7 @@ async function continueToNextPage() {
     console.log('Continue to next page clicked');
     
    
-    const continueBtn = document.getElementById('continueNextPageBtn');
+    const continueBtn = document.getElementById('continueNextPageBtn'); 
     if (continueBtn) {
         continueBtn.style.display = 'none';
     }
@@ -53,7 +53,7 @@ async function startRecitation() {
     if (isReciting) return;
     isReciting = true;
     audioChunks = [];
-    lastRevealedGlobalIndex = -1; /
+    lastRevealedGlobalIndex = -1;
     secondLastAyaCompleted = false; 
     
     // Hide continue button if visible
