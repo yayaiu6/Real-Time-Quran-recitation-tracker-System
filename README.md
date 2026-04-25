@@ -1,8 +1,7 @@
 # Real-Time Quran recitation tracker System
 
-[![Open Source](https://badges.frapsoft.com/os/v1/open-source.svg?v=103)](https://opensource.org/)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![<!-- ISLAMWARE -->](https://islamware.cybertopia.xyz/badges/html-xml.svg)](https://islamware.cybertopia.xyz)
+[![# ISLAMWARE](https://islamware.cybertopia.xyz/badges/python-shell-ruby-yaml.svg)](https://islamware.cybertopia.xyz)
 
 An open-source, AI-powered system for real-time assessment and word-by-word tracking of Quranic recitation. This project leverages advanced fuzzy string matching algorithms inspired by [Tarteel AI's research](https://tarteel.ai/blog) to provide accurate, tolerant alignment between spoken recitation and the canonical Quranic text.
 
