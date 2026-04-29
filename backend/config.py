@@ -51,9 +51,12 @@ MIN_AUDIO_ENERGY = 0.01  # Minimum audio energy (lower = silence)
 # ==============================================================================
 
 # ASR Backend Selection
-ASR_BACKEND = "nemo"  # Options: "whisper" (Groq cloud API) or "nemo" (local NVIDIA NeMo)
-                         # - "whisper": Uses Groq Whisper API (requires GROQ_API_KEY in .env)
+ASR_BACKEND = "nemo"  # Options: "whisper" (cloud API) or "nemo" (local NVIDIA NeMo)
+                         # - "whisper": Uses a cloud Whisper provider (Groq/OpenAI)
                          # - "nemo": Uses local NVIDIA NeMo model (requires GPU with CUDA for best performance)
+
+# Cloud Whisper Provider (only used when ASR_BACKEND = "whisper")
+ASR_CLOUD_PROVIDER = "groq"  # Options: "groq" or "openai"
 
 # NeMo Model Settings (only used when ASR_BACKEND = "nemo")
 NEMO_MODEL_PATH = "arabic-asr/conformer_ctc_small_60e_adamw_30wtr_32wv_40wte.nemo"  # Path to NeMo model file
@@ -130,4 +133,3 @@ If results show:
    - Decrease SEQUENCE_SKIP_MIN_WORDS to 8-10
    - Decrease SEQUENCE_ALERT_MIN_CONFIDENCE to 0.4
 """
-

@@ -1,6 +1,6 @@
 """
 ASR Backend Layer - Unified interface for speech-to-text transcription
-Supports both Groq Whisper (cloud) and NVIDIA NeMo (local) backends
+Supports both Groq/OpenAI Whisper (cloud) and NVIDIA NeMo (local) backends
 """
 
 import io
@@ -14,7 +14,9 @@ import config as app_config
 
 # Global variables for lazy loading
 _asr_backend: Optional[str] = None
+_cloud_provider: Optional[str] = None
 _groq_client = None
+_openai_client = None
 _nemo_model = None
 
 
@@ -32,8 +34,25 @@ def _get_asr_backend() -> str:
 
 
 # ==============================================================================
-# Groq Whisper Backend (Cloud API)
+# Cloud Whisper Backend (Groq/OpenAI API)
 # ==============================================================================
+
+def _get_cloud_provider() -> str:
+    """Get cloud provider for Whisper backend"""
+    global _cloud_provider
+    if _cloud_provider is None:
+        _cloud_provider = os.getenv(
+            "ASR_CLOUD_PROVIDER",
+            app_config.ASR_CLOUD_PROVIDER,
+        ).lower()
+        if _cloud_provider not in ["groq", "openai"]:
+            logging.warning(
+                f"Invalid ASR_CLOUD_PROVIDER '{_cloud_provider}', defaulting to 'groq'"
+            )
+            _cloud_provider = "groq"
+        logging.info(f"Cloud Whisper provider selected: {_cloud_provider}")
+    return _cloud_provider
+
 
 def _get_groq_client():
     """Get or create Groq client (lazy initialization)"""
@@ -48,9 +67,27 @@ def _get_groq_client():
     return _groq_client
 
 
+def _get_openai_client():
+    """Get or create OpenAI client (lazy initialization)"""
+    global _openai_client
+    if _openai_client is None:
+        try:
+            from openai import OpenAI
+        except ImportError as e:
+            raise RuntimeError(
+                "Missing OpenAI client library. Install with: pip install openai"
+            ) from e
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("Missing OpenAI API key. Set OPENAI_API_KEY in your environment or .env file.")
+        _openai_client = OpenAI(api_key=api_key)
+        logging.info("OpenAI Whisper client initialized")
+    return _openai_client
+
+
 def whisper_transcribe_wav_bytes(wav_bytes: bytes) -> str:
     """
-    Transcribe audio using Groq Whisper API
+    Transcribe audio using a cloud Whisper provider
     
     Args:
         wav_bytes: WAV audio data as bytes (16kHz mono recommended)
@@ -59,18 +96,29 @@ def whisper_transcribe_wav_bytes(wav_bytes: bytes) -> str:
         Transcribed text in Arabic
     """
     try:
-        client = _get_groq_client()
         wav_buffer = io.BytesIO(wav_bytes)
-        
-        transcription = client.audio.transcriptions.create(
-            file=("audio.wav", wav_buffer),
-            model="whisper-large-v3-turbo",
-            language="ar"
-        ).text
+        provider = _get_cloud_provider()
+
+        if provider == "groq":
+            client = _get_groq_client()
+            transcription = client.audio.transcriptions.create(
+                file=("audio.wav", wav_buffer),
+                model="whisper-large-v3-turbo",
+                language="ar"
+            ).text
+        elif provider == "openai":
+            client = _get_openai_client()
+            transcription = client.audio.transcriptions.create(
+                file=("audio.wav", wav_buffer),
+                model="whisper-1",
+                language="ar"
+            ).text
+        else:
+            raise RuntimeError(f"Unknown cloud provider: {provider}")
         
         return transcription
     except Exception as e:
-        logging.error(f"Groq Whisper transcription error: {e}")
+        logging.error(f"Whisper transcription error: {e}")
         raise
 
 
@@ -310,12 +358,19 @@ def initialize_backend():
     logging.info(f"Deploying ASR backend: {backend}")
     
     if backend == "whisper":
-        # Test Groq client initialization
+        # Test cloud client initialization
         try:
-            _get_groq_client()
-            logging.info("Groq Whisper client initialized and ready")
+            provider = _get_cloud_provider()
+            if provider == "groq":
+                _get_groq_client()
+                logging.info("Groq Whisper client initialized and ready")
+            elif provider == "openai":
+                _get_openai_client()
+                logging.info("OpenAI Whisper client initialized and ready")
+            else:
+                raise RuntimeError(f"Unknown cloud provider: {provider}")
         except Exception as e:
-            logging.error(f"Failed to initialize Groq Whisper: {e}")
+            logging.error(f"Failed to initialize Whisper: {e}")
             raise
     
     elif backend == "nemo":
@@ -381,8 +436,13 @@ def get_backend_info() -> dict:
     }
     
     if backend == "whisper":
-        info["initialized"] = _groq_client is not None
         info["type"] = "cloud"
+        provider = _get_cloud_provider()
+        info["provider"] = provider
+        if provider == "openai":
+            info["initialized"] = _openai_client is not None
+        else:
+            info["initialized"] = _groq_client is not None
     elif backend == "nemo":
         info["initialized"] = _nemo_model is not None
         info["type"] = "local"
