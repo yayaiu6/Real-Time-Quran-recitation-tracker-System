@@ -1,0 +1,88 @@
+.reader {
+  min-height: 0;
+  position: relative;
+}
+
+.pager {
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  direction: rtl;
+  display: flex;
+  position: absolute;
+  inset: 0;
+  overflow: auto hidden;
+}
+
+.pager::-webkit-scrollbar {
+  display: none;
+}
+
+.slide {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  background: var(--paper);
+  height: 100%;
+  box-shadow: inset 1px 0 0 var(--line), inset -1px 0 0 var(--line);
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  flex: 0 0 100%;
+  position: relative;
+  overflow: hidden auto;
+}
+
+.slide::-webkit-scrollbar {
+  display: none;
+}
+
+.slide canvas {
+  width: 100%;
+  display: block;
+}
+
+.slide.failed:after {
+  content: var(--page-failed,"");
+  color: var(--muted);
+  place-items: center;
+  font-size: 14px;
+  display: grid;
+  position: absolute;
+  inset: 0;
+}
+
+.loading {
+  background: var(--paper);
+  color: var(--muted);
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  display: flex;
+  position: absolute;
+  inset: 0;
+}
+
+.loading[hidden] {
+  display: none;
+}
+
+.spinner {
+  border: 3px solid #dcdcdc;
+  border-top-color: var(--green);
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  animation: .9s linear infinite spin;
+}
+
+.loading.error .spinner {
+  display: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,34 @@
+# Engineering guide
+
+## Where to work
+
+- `frontend/index.html` declares the reader shell; `frontend/src/reader-entry.js` is the composition root. `reader-shell.js` prepares the document, and `runtime-configuration.js` loads the recognition key.
+- Under `frontend/src/production/`, `app/` owns UI controllers, navigation, locales and preferences, text search, and recitation orchestration. `reader/` owns Mushaf/QVP rendering, page surfaces, position, and highlights. `presentation/` and `styles/` own presentation assets.
+- `recognition/` owns capture, the PCM worklet, SDK adaptation, frame shaping, and audio output. `session/` connects capture and recognition to either preview or tracking and owns live capture lifecycle. `vendor/` contains packaged browser bindings; preserve their contracts and notices.
+- `quran-preview/` owns the shared corpus, phonetics, greedy decoding, passage index, search pacing, and preview. `engine/` is optional and owns tracking, following, recovery, frame history, native alignment, and verdicts.
+- `frontend/public/` holds version-coupled renderer resources, SDK assets, the corpus, native engine assets, and audio/fonts. `backend/app/` owns HTTP routes and configuration; `backend/tests/` owns backend tests.
+
+## Startup and HTTP contracts
+
+The entry initializes the document and cue output, fetches `/api/config`, and injects rendering, recognition, corpus, and engine ports into `app/application/runtime.js`. The runtime opens the Mushaf, then mounts reader features. Reading does not require successful recognition configuration. Keep abort handling and disposal intact: on a non-persisted `pagehide`, the entry aborts startup/work and closes the mounted runtime and cue output.
+
+Vite proxies `/api` to FastAPI in development. FastAPI registers the API before mounting `frontend/build/` at `/` if that tree exists at startup. Keep the backend's release and static configuration separate from the optional engine loader. `/api/health` is the health check; `/api/config` returns `web_key` (or `null`) and `evaluation_available` with `Cache-Control: no-store`. The latter is a backend packaging check, not the frontend's live engine status. Backend compatibility routes supply QVP atlas/page data, chapter metadata, and `/api/search`; search allows limits of 30 and 400 and returns `X-Total-Count`. The application also reads local static QVP assets and uses the local corpus for verse search. Do not redirect those consumers to the compatibility API as part of unrelated changes.
+
+## Recitation and dependency boundary
+
+1. `app/recitation/prepare.js` starts SDK initialization and corpus loading separately. It publishes the corpus independently, opens alignment assets only if an engine is available, and hands a complete host to the UI session. The preparation step owns partial resources until that handoff.
+2. `recognition/microphone.js` acquires a mono `MediaStream`; the AudioWorklet delivers 16 kHz PCM, normally in 7,680-sample chunks. Cue and word playback use a separate output context. `session/live-host.js` coordinates capture, cue muting, SDK submission, and frame consumption. Preserve late-permission cancellation, denial/retry, stale callback guards, and stream release on stop/disposal. `recognition/test-audio.js` is an entry-imported capture adapter, not a standalone test; removing it changes a supported execution path.
+3. The vendored TajweedFormer 3.1.3 client emits frame data, not Arabic orthographic text. Keep primary and secondary frame arrays, frame count, speech data, and ordering intact. The elapsed time since PCM submission is diagnostic, not frame timing. Preserve the SDK vocabulary, inference settings, PCM processing, and resampler unless the task explicitly changes those contracts.
+4. Without a tracker, the preview decodes primary frames, buffers recent phonetics, and searches the corpus at the shared pacing thresholds. `feed(primary, count)` may return display words from a corpus candidate; `reset()` clears the take's state. Do not turn this into a raw phonetic display, fabricate text, lock position, move pages, or infer verdicts from the preview.
+5. With a tracker, the host uses the tracking event flow for position and verdict feedback. `engine/open-tracker.js` takes the corpus and native alignment bytes; `engine/alignment.js` owns the native wire protocol and memory. Keep engine dependencies directed toward shared preview code, never the reverse. Only the entry's optional dynamic glob should introduce the engine to the application. Do not add static imports or barrel re-exports that prevent a build when the directory is absent.
+
+Use injected ports for browser and native integration instead of coupling controllers to SDK, WASM, or capture internals. Keep one-based reader page/surah/ayah coordinates separate from corpus, native, and SDK indices; use the atlas/word mapping for display. Keep UI state and mistake history outside the engine. Send diagnostics to DevTools; preserve the existing small tracking-unavailable notice and normal reading, search, and recitation controls.
+
+## Validate changes
+
+Prefer `docker compose up --build` from the repository root. Compose publishes the single app service on loopback (port 8000 by default, configurable via `APP_PORT`) and reads an optional root `.env`. The production `Dockerfile` builds static assets separately and runs only Python/Uvicorn as a non-root user. Without Docker, run `cd backend` then `python main.py` (Python 3.12+ and Node.js/npm); the launcher prepares `.venv` and rebuilds the frontend when inputs change. FastAPI reads a root `.env` without overriding the process environment. Use a `QURANLAB_WEB_KEY` authorized for the exact browser origin and localhost or HTTPS for microphone access. Do not print the key or put server secrets in client configuration.
+
+- Run `npm --prefix frontend ci` and `npm --prefix frontend run build` from the root. There is no frontend test runner. Run `.\.venv\Scripts\python.exe -m pytest backend/tests -q` for backend checks.
+- For a boundary change, build again in an isolated frontend copy with `src/production/engine/` physically omitted. Use a fresh output directory. Verify `data/quran.json` is present and the tracker chunk, `data/engine.wasm.gz`, and `data/engine-words.jsonl.gz` are absent. Do not simulate absence by blocking files on the full build.
+- Serve each build in turn with FastAPI. Check page rendering, navigation, and text search in both modes. With a real microphone, check permission denial/retry, two start/stop cycles, and that the microphone is released. In full mode check following and feedback; without the engine check readable Arabic preview, no tracking or corrections, and the unavailable notice. Inspect browser console and failed requests.
+- Consult `LICENSE` and preserve packaged legal notices. Do not assume deployment rights from access to source, data, or a working SDK key.

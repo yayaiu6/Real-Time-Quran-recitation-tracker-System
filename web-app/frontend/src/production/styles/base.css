@@ -1,0 +1,76 @@
+:root {
+  --paper: #fbfbfb;
+  --bar: #f6f6f6;
+  --box: #ececec;
+  --box-line: #d7d7d7;
+  --line: #e2e2e2;
+  --ink: #1b1b1b;
+  --muted: #8d8d8d;
+  --outside: #e7e7ea;
+  --green: #2cc46e;
+  --green-light: #8cf0b6;
+  --v-ok: #1daa61;
+  --v-wrong: #b3261e;
+  --v-tajweed: #d9a400;
+  --v-unsure: #8f949c;
+  --v-skipped: #8f949c;
+  --sheet-pad: 24px;
+  --header-h: 60px;
+  --footer-h: 104px;
+  --col: min(100vw, max(400px, calc((100dvh - var(--header-h) - var(--footer-h)) / 1.5)));
+  --lightningcss-light: initial;
+  --lightningcss-dark:  ;
+  color-scheme: light;
+}
+
+@font-face {
+  font-family: KFGQPC Hafs Smart;
+  src: url(/fonts/HafsSmart_08.ttf)format("truetype");
+  font-display: block;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,body {
+  background: var(--outside);
+  height: 100%;
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  margin: 0;
+  font-family: -apple-system,BlinkMacSystemFont,SF Arabic,Segoe UI,Noto Sans Arabic,Tahoma,sans-serif;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: 0 0;
+  border: 0;
+  padding: 0;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.app {
+  width: var(--col);
+  background: var(--paper);
+  grid-template-rows: auto 1fr auto;
+  margin-inline: auto;
+  display: grid;
+  position: fixed;
+  inset: 0;
+  box-shadow: 0 0 0 1px #0000000a,0 8px 40px #00000014;
+}

@@ -1,0 +1,17 @@
+{
+  "name": "recitation-tracker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@quran-lab/tajweedformer": "4.0.0",
+    "@quran.ws/engine": "0.8.0"
+  },
+  "devDependencies": {
+    "vite": "6.4.6"
+  }
+}

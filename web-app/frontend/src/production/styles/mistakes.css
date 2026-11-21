@@ -1,0 +1,239 @@
+.sheet.tall {
+  max-height: min(86dvh,760px);
+}
+
+.mistakes-summary {
+  padding: 18px var(--sheet-pad) 0;
+}
+
+.mistakes-summary:has(>:not([hidden])) {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+
+.mistakes-range {
+  color: #555;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.mistakes-counts {
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  display: flex;
+}
+
+.mistakes-range[hidden],.mistakes-counts[hidden] {
+  display: none;
+}
+
+.count-chip {
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mistakes-list {
+  padding: 20px var(--sheet-pad) 20px;
+  overscroll-behavior: contain;
+  flex-direction: column;
+  flex: 1;
+  gap: 22px;
+  min-height: 120px;
+  margin: 0;
+  list-style: none;
+  display: flex;
+  overflow-y: auto;
+}
+
+[data-tone=wrong] {
+  --tone: var(--v-wrong);
+}
+
+[data-tone=tajweed] {
+  --tone: var(--v-tajweed);
+}
+
+[data-tone=ok] {
+  --tone: var(--v-ok);
+}
+
+.mistake {
+  text-align: start;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  display: flex;
+}
+
+.mistake-head {
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  display: flex;
+}
+
+.mistake-ref {
+  color: #333;
+  font-variant-numeric: tabular-nums;
+  border: 1.5px solid #bdbdbd;
+  border-radius: 7px;
+  flex: none;
+  padding: 3px 9px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mistake-kind {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.mistake-corrected {
+  color: var(--v-ok);
+  background: color-mix(in srgb, var(--v-ok) 14%, transparent);
+  border-radius: 999px;
+  flex: none;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mistake-box {
+  border: 1.5px solid var(--box-line);
+  border-inline-start: 4px solid var(--tone);
+  background: #fff;
+  border-radius: 12px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px 16px;
+  display: flex;
+}
+
+.mistake:active .mistake-box {
+  background: #f6f6f6;
+}
+
+.mistake-ayah {
+  text-align: start;
+  color: var(--ink);
+  direction: rtl;
+  font-family: KFGQPC Hafs Smart;
+  font-size: 25px;
+  line-height: 1.9;
+}
+
+.mistake-ayah .mistaken {
+  color: var(--tone);
+}
+
+.mistake-box.two-rows {
+  gap: 0;
+  padding-block: 4px;
+}
+
+.mistake-row {
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  display: flex;
+}
+
+.mistake-row+.mistake-row {
+  border-top: 1px solid var(--line);
+}
+
+.mistake-label {
+  min-width: 58px;
+  color: var(--muted);
+  flex: none;
+  font-size: 14px;
+}
+
+.mistake-row>:last-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.mistake-ayah .expected-word {
+  color: var(--v-ok);
+}
+
+.mistake-sounds {
+  color: var(--muted);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  display: flex;
+}
+
+.sound {
+  text-align: center;
+  border-radius: 10px;
+  min-width: 46px;
+  padding: 2px 12px 6px;
+  font-family: SF Arabic,Geeza Pro,Noto Naskh Arabic,Traditional Arabic,serif;
+  font-size: 26px;
+  line-height: 1.5;
+}
+
+.sound.heard {
+  color: var(--v-wrong);
+  background: color-mix(in srgb, var(--v-wrong) 12%, transparent);
+}
+
+.sound.right {
+  color: var(--v-ok);
+  background: color-mix(in srgb, var(--v-ok) 12%, transparent);
+}
+
+.mistake-detail {
+  color: color-mix(in srgb, var(--tone) 82%, #000);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mistakes-empty {
+  text-align: center;
+  color: var(--muted);
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 34px 12px;
+  font-size: 15px;
+  display: flex;
+}
+
+.mistakes-empty b {
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.feedback-notice {
+  padding: 14px var(--sheet-pad) calc(20px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  display: flex;
+}
+
+.notice-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--green);
+  flex: none;
+  margin-top: 1px;
+}

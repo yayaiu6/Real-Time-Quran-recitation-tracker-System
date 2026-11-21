@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.pytest_cache/
+node_modules/
+frontend/build/
+backend/build/
+frontend/private-audio/
+.env
+*.egg-info/

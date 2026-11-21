@@ -1,0 +1,1 @@
+"""Recitation Tracker HTTP application."""

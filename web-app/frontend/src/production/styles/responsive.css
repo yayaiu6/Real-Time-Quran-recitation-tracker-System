@@ -1,0 +1,11 @@
+@media (min-width:640px) and (pointer:fine) {
+  .turn {
+    display: block;
+  }
+  .turn-next {
+    left: calc(50% - var(--col) / 2 - 64px);
+  }
+  .turn-prev {
+    right: calc(50% - var(--col) / 2 - 64px);
+  }
+}

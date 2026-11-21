@@ -1,0 +1,53 @@
+.sheet {
+  width: min(var(--col), 100vw);
+  max-width: 100vw;
+  max-height: min(80dvh,640px);
+  color: var(--ink);
+  background: #fff;
+  border: 0;
+  border-radius: 16px 16px 0 0;
+  margin: auto auto 0;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 -6px 30px #00000026;
+}
+
+.sheet[open] {
+  flex-direction: column;
+  animation: .22s ease-out rise;
+  display: flex;
+}
+
+.sheet::backdrop {
+  background: #0000004d;
+}
+
+@keyframes rise {
+  0% {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+
+.sheet-head {
+  padding: 20px var(--sheet-pad) 16px;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+  gap: 10px;
+  display: flex;
+}
+
+.sheet-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+}
+
+.sheet-grip {
+  background: #cfcfcf;
+  border-radius: 3px;
+  flex: none;
+  width: 44px;
+  height: 5px;
+  margin: 10px auto 2px;
+}
