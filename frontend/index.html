@@ -1,67 +1,277 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Quran recitation tracker</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Real-Time Quran recitation tracker</h1>
-            <p>تسميع القرآن الكريم بالذكاء الاصطناعي</p>
-        </div>
+<html lang="ar" dir="rtl" style="--v-ok: #1daa61; --v-tajweed: #d9a400; --v-unsure: #8f949c; --v-wrong: #b3261e; --v-skipped: #8f949c; --page-failed: &quot;تعذّر تحميل الصفحة&quot;;" class="titles-ready tw:[--header-h:72px]"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>متتبع التلاوة</title>
+    <meta name="description" content="متتبع التلاوة يستمع إلى تلاوتك ويتابعك على صفحة المصحف كلمةً كلمة: يجد موضعك، ويلوّن ما تتلوه، ويبيّن أخطاءك. Recitation Tracker follows your Quran recitation on the mushaf page, word by word, and shows your mistakes.">
+    <meta name="application-name" content="Recitation Tracker">
+    <meta name="apple-mobile-web-app-title" content="Recitation Tracker">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#f6f6f6">
 
-        <div class="search-container">
-            <input type="text" id="searchInput" class="search-input" placeholder="ابحث في القرآن...">
-            <div id="searchResults" class="search-results" style="display: none;"></div>
-        </div>
+<link rel="icon" href="data:,">
 
-        <div class="controls">
-            <div class="control-group">
-                <label for="suraSelect">السورة:</label>
-                <select id="suraSelect">
-                    <option value="">اختر السورة</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="pageSelect">الصفحة:</label>
-                <select id="pageSelect">
-                    <option value="1">الصفحة 1</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="juzSelect">الجزء:</label>
-                <select id="juzSelect">
-                    <option value="">اختر الجزء</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <button id="startRecitationBtn" class="nav-btn">ابدأ التسميع</button>
-                <button id="stopRecitationBtn" class="nav-btn" style="display: none;">إيقاف التسميع</button>
-            </div>
-        </div>
 
-        <div class="navigation">
-            <button id="prevBtn" class="nav-btn">الصفحة السابقة</button>
-            <button id="nextBtn" class="nav-btn">الصفحة التالية</button>
-            <button id="continueNextPageBtn" class="nav-btn" style="display: none; background: #d4af37; border-color: #b8941f;">المتابعة للصفحة التالية</button>
-        </div>
 
-        <div class="page-info" id="pageInfo">جاري التحميل...</div>
-        <div class="mushaf-page" id="mushafPage">
-            <div class="loading">جاري تحميل القرآن الكريم...</div>
-        </div>
+    <!-- Deployment-specific canonical and social image URLs are intentionally unset. -->
+    <!--site-url-->
 
-        <div class="navigation">
-            <button id="prevBtnBottom" class="nav-btn">الصفحة السابقة</button>
-            <button id="nextBtnBottom" class="nav-btn">الصفحة التالية</button>
+    <!--/site-url-->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Recitation Tracker">
+    <meta property="og:title" content="متتبع التلاوة">
+    <meta property="og:description" content="اتلُ القرآن، والمصحف يتابعك كلمةً كلمة. Recite the Quran, and the mushaf follows you word by word.">
+
+
+
+    <meta property="og:locale" content="ar_AR">
+    <meta property="og:locale:alternate" content="en_US">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="متتبع التلاوة">
+    <meta name="twitter:description" content="اتلُ القرآن، والمصحف يتابعك كلمةً كلمة. Recite the Quran, and the mushaf follows you word by word.">
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Recitation Tracker",
+        "alternateName": "متتبع التلاوة",
+        "description": "Follows your Quran recitation on the mushaf page, word by word: it finds where you are, colours what you recite, and shows your mistakes.",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires a microphone and WebAssembly",
+        "inLanguage": ["ar", "en"],
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+    <link rel="preconnect" href="https://cdn.quran.ws/" crossorigin="">
+    <script>
+      // Fail open if the module is unavailable; lifecycle ownership starts in reader-entry.js.
+      document.documentElement.dataset.uiBoot = "loading";
+      setTimeout(() => {
+        if (!document.documentElement.hasAttribute("data-ui-boot")) return;
+        const app = document.getElementById("app");
+        if (app) app.inert = false;
+        delete document.documentElement.dataset.uiBoot;
+      }, 12000);
+    </script>
+    <script type="module" src="/src/reader-entry.js"></script>
+  </head>
+  <body>
+    <span id="startup-label" role="status" class="tw:sr-only tw:hidden tw:[[data-ui-boot]_&]:block">جارٍ تجهيز الواجهة</span>
+    <div class="app tw:grid-cols-1 tw:[[data-ui-boot]_&]:pointer-events-none tw:[[data-ui-boot]_&]:[&_button]:pointer-events-none tw:[[data-ui-boot]_&]:[&_button]:bg-ui-muted/10 tw:[[data-ui-boot]_&]:[&_button]:bg-none tw:[[data-ui-boot]_&]:[&_button]:border-transparent tw:[[data-ui-boot]_&]:[&_button]:shadow-none tw:[[data-ui-boot]_&]:[&_button]:transition-none tw:[[data-ui-boot]_&]:[&_button>*]:invisible tw:[[data-ui-boot]_&]:[&_button::before]:hidden tw:[[data-ui-boot]_&]:[&_#reader>*]:invisible tw:[[data-ui-boot]_&]:[&_#header-position]:invisible tw:[[data-ui-boot]_&]:[&_#footer>div:first-child]:invisible tw:[[data-ui-boot]_&]:[&_#turn-next]:invisible tw:[[data-ui-boot]_&]:[&_#turn-prev]:invisible" id="app">
+      <header class="topbar tw:relative tw:isolate tw:flex tw:h-[calc(var(--header-h)+env(safe-area-inset-top))] tw:min-w-0 tw:items-center tw:gap-1 tw:border-0 tw:bg-ui-surface tw:px-3 tw:pt-[env(safe-area-inset-top)] tw:pb-2 tw:text-ui-ink tw:min-[380px]:gap-2 tw:min-[380px]:px-4" id="topbar">
+        <div class="tw:pointer-events-none tw:absolute tw:inset-0 tw:-z-10 tw:overflow-hidden" aria-hidden="true">
+          <span class="tw:absolute tw:-end-12 tw:-top-24 tw:h-60 tw:w-96 tw:rounded-full tw:bg-radial tw:from-ui-mint tw:via-ui-mint/45 tw:to-transparent"></span>
+          <span class="tw:absolute tw:start-1/4 tw:-bottom-28 tw:h-48 tw:w-80 tw:rounded-full tw:bg-radial tw:from-ui-teal/80 tw:via-ui-surface/40 tw:to-transparent"></span>
         </div>
+        <button id="title" type="button" aria-haspopup="dialog" aria-labelledby="surah-name header-index-action" aria-describedby="page-meta" class="tw:flex tw:min-w-0 tw:flex-1 tw:flex-col tw:items-start tw:justify-center tw:gap-0.5 tw:rounded-lg tw:py-1 tw:text-start tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-ui-accent">
+          <span class="tw:flex tw:max-w-full tw:min-w-0 tw:items-center tw:gap-1.5">
+            <span id="surah-name" class="tw:block tw:min-w-0 tw:truncate tw:text-[17px] tw:leading-6 tw:font-semibold tw:text-ui-ink tw:min-[380px]:text-[19px] tw:min-[430px]:text-xl">سورة الفاتحة</span>
+            <svg class="tw:size-3.5 tw:shrink-0 tw:text-ui-muted" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+          </span>
+          <span id="page-meta" class="tw:sr-only">صفحة ١ | جزء ١ | حزب ١</span>
+          <span id="header-index-action" class="tw:sr-only">فتح الفهرس</span>
+          <span class="tw:flex tw:max-w-full tw:min-w-0 tw:items-center tw:gap-1 tw:whitespace-nowrap tw:text-[10px] tw:leading-4 tw:tabular-nums tw:min-[380px]:text-[11px]" aria-hidden="true">
+            <span id="header-page" class="tw:font-semibold tw:text-ui-ink">صفحة ١</span>
+            <span class="tw:text-ui-muted/50">·</span>
+            <span id="header-divisions" class="tw:hidden tw:text-ui-muted tw:min-[380px]:inline">الجزء ١ · الحزب ١</span>
+            <span id="header-divisions-compact" class="tw:text-ui-muted tw:min-[380px]:hidden">ج ١ · ح ١</span>
+          </span>
+        </button>
+        <button id="bookmark" type="button" aria-label="علامة على الصفحة" aria-pressed="false" class="tw:flex tw:size-11 tw:shrink-0 tw:items-center tw:justify-center tw:rounded-2xl tw:p-3 tw:text-ui-muted tw:transition-colors tw:duration-200 tw:hover:bg-white/70 tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-ui-accent tw:aria-pressed:bg-ui-mint/70 tw:aria-pressed:text-ui-accent tw:motion-reduce:transition-none"></button>
+        <div class="tw:flex tw:h-11 tw:w-[88px] tw:shrink-0 tw:items-stretch tw:rounded-[22px] tw:bg-linear-to-br tw:from-white tw:to-ui-control/90 tw:shadow-md tw:shadow-emerald-950/8 tw:ring-1 tw:ring-white/80 tw:ring-inset">
+          <button id="search" type="button" aria-label="بحث" aria-haspopup="dialog" class="tw:flex tw:size-11 tw:shrink-0 tw:items-center tw:justify-center tw:rounded-s-[22px] tw:border-e tw:border-ui-muted/15 tw:p-[11px] tw:text-ui-ink tw:transition-colors tw:duration-200 tw:hover:bg-white tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none"></button>
+          <button id="settings" type="button" aria-label="الإعدادات" aria-haspopup="dialog" class="tw:flex tw:size-11 tw:shrink-0 tw:items-center tw:justify-center tw:rounded-e-[22px] tw:p-[11px] tw:text-ui-ink tw:transition-colors tw:duration-200 tw:hover:bg-white tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none"></button>
+        </div>
+        <div id="header-position" role="progressbar" aria-label="موضع الصفحة داخل السورة" aria-valuemin="0" aria-valuemax="1" aria-valuenow="1" hidden class="tw:absolute tw:inset-x-3 tw:bottom-1 tw:h-[3px] tw:overflow-hidden tw:rounded-full tw:bg-ui-muted/10 tw:[&[hidden]]:hidden tw:min-[380px]:inset-x-4">
+          <span id="header-position-fill" class="tw:block tw:h-full tw:w-full tw:origin-right tw:scale-x-[var(--header-position,0)] tw:rounded-full tw:bg-linear-to-l tw:from-ui-accent tw:to-emerald-500 tw:transition-transform tw:duration-200 tw:motion-reduce:transition-none"></span>
+        </div>
+      </header>
+
+      <main class="reader" id="reader">
+        <div class="pager" id="pager"></div>
+        <div id="text-view" hidden=""></div>
+        <div class="loading" id="loading" hidden="">
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="loading-text">جارٍ تحميل المصحف…</span>
+        </div>
+      </main>
+
+      <footer class="footer tw:grid tw:h-[calc(104px+env(safe-area-inset-bottom))] tw:min-w-0 tw:grid-cols-1 tw:grid-rows-[20px_56px] tw:content-end tw:items-stretch tw:gap-2 tw:border-0 tw:bg-[#fbfbfb] tw:px-3 tw:pt-1 tw:pb-[calc(12px+env(safe-area-inset-bottom))] tw:min-[380px]:px-4 tw:data-[state=failed]:h-auto tw:data-[state=failed]:min-h-[calc(104px+env(safe-area-inset-bottom))] tw:data-[state=failed]:grid-rows-[auto_56px]" id="footer" data-state="idle">
+        <div class="tw:flex tw:min-w-0 tw:items-center tw:justify-between tw:gap-3 tw:text-xs tw:text-slate-500">
+          <span id="heard" class="tw:min-w-0 tw:truncate tw:leading-5 tw:[&[hidden]]:hidden" dir="auto" hidden></span>
+          <p id="notice" class="tw:m-0 tw:min-w-0 tw:whitespace-normal tw:text-red-700 tw:[&[hidden]]:hidden" role="status" hidden></p>
+          <p id="engine-status" class="tw:m-0 tw:min-w-0 tw:text-xs tw:[&[hidden]]:hidden" role="status" hidden></p>
+          <div id="timer" class="tw:ms-auto tw:flex tw:shrink-0 tw:items-center tw:gap-1.5 tw:font-medium tw:tabular-nums tw:[&[hidden]]:hidden" hidden>
+            <span class="tw:size-1.5 tw:rounded-full tw:bg-emerald-500" aria-hidden="true"></span>
+            <span id="timer-text">٠٠:٠٠</span>
+          </div>
+          <div id="prep" class="tw:sr-only" role="status" hidden></div>
+        </div>
+        <div class="tw:flex tw:min-w-0 tw:items-center tw:justify-between tw:gap-3">
+          <button id="mic" type="button" aria-label="ابدأ التلاوة" aria-pressed="false" class="tw:relative tw:isolate tw:flex tw:h-14 tw:min-w-0 tw:max-w-60 tw:flex-1 tw:items-center tw:justify-center tw:gap-2 tw:overflow-hidden tw:rounded-2xl tw:border tw:border-emerald-600/20 tw:bg-linear-to-br tw:from-emerald-500 tw:via-emerald-700 tw:to-emerald-800 tw:px-2 tw:py-0 tw:text-sm tw:font-semibold tw:text-white tw:shadow-lg tw:shadow-emerald-700/20 tw:transition tw:duration-150 tw:before:pointer-events-none tw:before:absolute tw:before:inset-x-0 tw:before:top-0 tw:before:h-1/2 tw:before:bg-linear-to-b tw:before:from-white/20 tw:before:to-transparent tw:hover:brightness-105 tw:focus-visible:outline-2 tw:focus-visible:outline-offset-4 tw:focus-visible:outline-emerald-600 tw:active:scale-[.98] tw:disabled:cursor-wait tw:motion-reduce:transition-none tw:min-[380px]:px-3 tw:min-[380px]:text-base">
+            <span class="mic-icon tw:size-6 tw:shrink-0" aria-hidden="true"><svg data-control-icon viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg></span>
+            <span class="stop-icon tw:relative tw:m-0 tw:size-5 tw:shrink-0 tw:rounded-[5px] tw:bg-white tw:motion-safe:animate-pulse" aria-hidden="true"></span>
+            <span class="mic-spinner tw:relative tw:inset-auto tw:m-0 tw:size-6 tw:shrink-0 tw:rounded-full tw:border-[2.5px] tw:border-white/35 tw:border-t-white tw:animate-spin tw:motion-reduce:animate-none" aria-hidden="true"></span>
+            <span id="mic-label" class="tw:whitespace-nowrap tw:leading-none">ابدأ التلاوة</span>
+          </button>
+          <div id="footer-tools" class="tw:flex tw:h-14 tw:shrink-0 tw:items-stretch tw:rounded-2xl tw:bg-linear-to-br tw:from-slate-100 tw:to-gray-200/80 tw:ring-1 tw:ring-white/80 tw:ring-inset">
+            <button id="hide" type="button" aria-label="إخفاء ما لم يُتلَ" aria-pressed="false" class="tw:flex tw:w-11 tw:items-center tw:justify-center tw:rounded-s-2xl tw:border-e tw:border-slate-300/60 tw:p-3 tw:text-slate-800 tw:transition-colors tw:hover:bg-slate-200/60 tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-emerald-600 tw:aria-pressed:bg-emerald-100 tw:aria-pressed:text-emerald-800 tw:min-[380px]:w-12"><svg data-control-icon viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.8 5.2A10.8 10.8 0 0 1 12 5c5.5 0 9 7 9 7a16.6 16.6 0 0 1-3.1 4M6.3 6.3A19 19 0 0 0 3 12s3.5 7 9 7a10.2 10.2 0 0 0 4.2-.9"/></svg></button>
+            <button id="mistakes" type="button" aria-haspopup="dialog" class="tw:flex tw:items-center tw:justify-center tw:gap-1.5 tw:rounded-e-2xl tw:px-2 tw:py-0 tw:text-sm tw:font-semibold tw:text-slate-800 tw:transition-colors tw:hover:bg-slate-200/60 tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-emerald-600 tw:min-[380px]:px-3">
+              <span class="tw:relative tw:block tw:size-5 tw:shrink-0" aria-hidden="true">
+                <svg class="tw:size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>
+                <span id="mistakes-count" class="tw:absolute tw:-start-2 tw:-top-2 tw:inline-flex tw:h-[18px] tw:min-w-[18px] tw:items-center tw:justify-center tw:rounded-full tw:bg-red-500 tw:px-1 tw:text-[10px] tw:font-bold tw:text-white tw:ring-2 tw:ring-white tw:tabular-nums tw:[&[hidden]]:hidden" hidden>٠</span>
+              </span>
+              <span id="mistakes-label">الأخطاء</span>
+            </button>
+          </div>
+        </div>
+        <!-- Required by the view controller. -->
+        <button id="tafsir" type="button" hidden tabindex="-1" aria-hidden="true" class="tw:hidden"></button>
+      </footer>
+      <!-- The page's own furniture, shown in the bars' place while they are away (a tap on the page). -->
+      <div class="page-top" id="page-top" aria-hidden="true">
+        <span id="pf-surah">الفاتحة</span>
+        <span class="pf-divisions">
+          <span id="pf-juz">الجزء ١</span>
+          <span class="pf-hizb"><span class="pf-pie" id="pf-pie"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12 L12 3 A9 9 0 0 1 21 12 Z" fill="currentColor"></path><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"></circle></svg></span><span id="pf-hizb">الحزب ١</span></span>
+        </span>
+      </div>
+      <div class="page-bottom" id="page-bottom" aria-hidden="true"><span id="pf-page">١</span></div>
     </div>
 
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="core.js"></script>
-    <script src="AI_integration.js"></script>
-</body>
-</html>
+    <!-- Navigation is pointer/keyboard driven; the buttons remain a hidden programmatic contract. -->
+    <button class="turn turn-next tw:hidden" id="turn-next" aria-label="الصفحة التالية" aria-hidden="true" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></button>
+    <button class="turn turn-prev tw:hidden" id="turn-prev" aria-label="الصفحة السابقة" aria-hidden="true" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"></path></svg></button>
+
+    <!-- The index: where you are, then the surahs, the parts, and your bookmarks. -->
+    <dialog class="sheet tall tw:h-[min(88dvh,780px)] tw:max-h-[calc(100dvh-12px)] tw:rounded-t-[28px] tw:border-0 tw:bg-[#fbfbfb] tw:shadow-2xl tw:shadow-emerald-950/15 tw:backdrop:bg-slate-950/35 tw:motion-reduce:animate-none" id="index-sheet" aria-labelledby="index-title">
+      <div class="tw:mx-auto tw:mt-2.5 tw:h-1 tw:w-9 tw:shrink-0 tw:rounded-full tw:bg-slate-300/70" aria-hidden="true"></div>
+      <div class="tw:flex tw:shrink-0 tw:items-center tw:justify-between tw:px-4 tw:py-1">
+        <h2 id="index-title" class="tw:m-0 tw:text-lg tw:font-semibold tw:text-ui-ink">الفهرس</h2>
+        <button id="index-close" type="button" data-close aria-label="إغلاق الفهرس" class="tw:flex tw:size-11 tw:items-center tw:justify-center tw:rounded-full tw:p-3 tw:text-ui-muted tw:transition-colors tw:hover:bg-ui-control tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none"></button>
+      </div>
+      <div class="tw:flex tw:shrink-0 tw:flex-col tw:gap-2 tw:px-3 tw:pb-1 tw:min-[380px]:px-4">
+        <button type="button" id="recent" class="tw:flex tw:min-h-16 tw:w-full tw:items-center tw:gap-3 tw:rounded-2xl tw:bg-linear-to-br tw:from-ui-mint/80 tw:via-ui-surface tw:to-ui-teal/70 tw:px-3 tw:py-2 tw:text-start tw:ring-1 tw:ring-ui-accent/10 tw:ring-inset tw:transition-colors tw:hover:brightness-[.98] tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none">
+          <span class="tw:flex tw:size-9 tw:shrink-0 tw:items-center tw:justify-center tw:rounded-xl tw:bg-white/80 tw:p-2 tw:text-ui-accent" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v15M3 4.5C6 3.5 9 4 12 5c3-1 6-1.5 9-.5V19c-3-1-6-.5-9 .5C9 18.5 6 18 3 19z"/></svg>
+          </span>
+          <span class="tw:min-w-0 tw:flex-1">
+            <span id="recent-title" class="tw:block tw:text-[10px] tw:leading-4 tw:font-medium tw:text-ui-muted">متابعة القراءة</span>
+            <span class="tw:flex tw:min-w-0 tw:items-baseline tw:gap-2">
+              <b id="recent-name" class="tw:min-w-0 tw:truncate tw:text-base tw:font-semibold tw:text-ui-ink"></b>
+              <small id="recent-page" class="tw:shrink-0 tw:text-[11px] tw:text-ui-muted"></small>
+            </span>
+          </span>
+          <span id="recent-ref" dir="ltr" class="tw:shrink-0 tw:rounded-lg tw:bg-white/75 tw:px-2 tw:py-1 tw:text-[11px] tw:font-medium tw:text-ui-accent tw:tabular-nums"></span>
+          <span id="index-recent-go" data-icon="go" class="tw:size-4 tw:shrink-0 tw:text-ui-accent tw:ltr:rotate-180" aria-hidden="true"></span>
+        </button>
+        <h3 id="lists-title" class="tw:sr-only">السور والأجزاء</h3>
+        <div id="index-tabs" role="tablist" aria-labelledby="lists-title" class="tw:grid tw:grid-cols-3 tw:gap-1 tw:rounded-2xl tw:bg-ui-control tw:p-1">
+          <button id="index-tab-surahs" type="button" role="tab" data-tab="surahs" aria-selected="true" aria-controls="index-panel" class="tw:flex tw:min-h-11 tw:items-center tw:justify-center tw:rounded-xl tw:px-2 tw:text-sm tw:font-semibold tw:text-ui-muted tw:transition-colors tw:aria-selected:bg-white tw:aria-selected:text-ui-accent tw:aria-selected:shadow-sm tw:focus-visible:outline-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none">السور</button>
+          <button id="index-tab-parts" type="button" role="tab" data-tab="parts" aria-selected="false" aria-controls="index-panel" tabindex="-1" class="tw:flex tw:min-h-11 tw:items-center tw:justify-center tw:rounded-xl tw:px-2 tw:text-sm tw:font-semibold tw:text-ui-muted tw:transition-colors tw:aria-selected:bg-white tw:aria-selected:text-ui-accent tw:aria-selected:shadow-sm tw:focus-visible:outline-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none">الأجزاء</button>
+          <button id="index-tab-bookmarks" type="button" role="tab" data-tab="bookmarks" aria-selected="false" aria-controls="index-panel" tabindex="-1" class="tw:flex tw:min-h-11 tw:items-center tw:justify-center tw:rounded-xl tw:px-2 tw:text-sm tw:font-semibold tw:text-ui-muted tw:transition-colors tw:aria-selected:bg-white tw:aria-selected:text-ui-accent tw:aria-selected:shadow-sm tw:focus-visible:outline-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none">العلامات</button>
+        </div>
+        <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
+          <button type="button" id="index-sort" class="tw:inline-flex tw:min-h-11 tw:shrink-0 tw:items-center tw:gap-1.5 tw:rounded-xl tw:px-2 tw:text-xs tw:font-medium tw:text-ui-muted tw:transition-colors tw:hover:bg-ui-control tw:focus-visible:outline-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none">
+            <span id="index-sort-icon" data-icon="sort" class="tw:size-4" aria-hidden="true"></span>
+            <span id="sort-label" class="tw:sr-only">الترتيب</span><b id="sort-value" class="tw:font-medium"></b>
+          </button>
+        </div>
+      </div>
+      <div id="index-panel" role="tabpanel" aria-labelledby="index-tab-surahs" class="tw:flex tw:min-h-0 tw:flex-1 tw:px-3 tw:pb-[max(12px,env(safe-area-inset-bottom))] tw:min-[380px]:px-4">
+        <ul id="index-list" tabindex="0" class="tw:m-0 tw:min-h-0 tw:min-w-0 tw:flex-1 tw:list-none tw:overflow-y-auto tw:overscroll-contain tw:border-0 tw:bg-transparent tw:p-0 tw:pe-1 tw:[scrollbar-width:thin] tw:[scrollbar-color:#a3c7b7_transparent] tw:[&::-webkit-scrollbar]:w-1 tw:[&::-webkit-scrollbar-track]:bg-transparent tw:[&::-webkit-scrollbar-thumb]:rounded-full tw:[&::-webkit-scrollbar-thumb]:bg-[#a3c7b7] tw:[&::-webkit-scrollbar-thumb:hover]:bg-ui-accent tw:forced-colors:[scrollbar-color:auto]"></ul>
+        <!-- Required by the controller; users navigate through the Parts tab. -->
+        <nav id="juz-rail" class="tw:hidden" aria-hidden="true" inert></nav>
+      </div>
+    </dialog>
+
+    <!-- Search: a surah by name, a page by number, an ayah by its words. -->
+    <dialog class="page-dialog tw:bg-ui-surface tw:text-ui-ink tw:backdrop:bg-slate-950/35" id="search-page" aria-labelledby="search-title">
+      <div class="tw:flex tw:shrink-0 tw:items-center tw:gap-3 tw:px-4 tw:pb-3 tw:pt-[max(16px,env(safe-area-inset-top))]">
+        <button type="button" class="tw:flex tw:size-11 tw:shrink-0 tw:items-center tw:justify-center tw:rounded-full tw:bg-ui-control tw:p-3 tw:text-ui-muted tw:transition-colors tw:hover:bg-ui-mint tw:focus-visible:outline-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none" data-close="" aria-label="رجوع"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="tw:ltr:rotate-180" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+        <h2 id="search-title" class="tw:m-0 tw:text-lg tw:font-semibold">بحث</h2>
+      </div>
+      <label class="search-field tw:mx-4 tw:mb-4 tw:mt-0 tw:min-h-14 tw:gap-2 tw:rounded-2xl tw:border tw:border-ui-accent/15 tw:bg-white tw:px-3 tw:py-1 tw:shadow-sm tw:shadow-emerald-950/5 tw:transition-colors tw:focus-within:border-ui-accent/50 tw:focus-within:ring-2 tw:focus-within:ring-ui-accent/10 tw:motion-reduce:transition-none">
+        <span class="search-icon" data-icon="search"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path></svg></span>
+        <input id="search-input" class="tw:min-w-0 tw:bg-transparent tw:py-3 tw:text-base tw:text-ui-ink tw:outline-none tw:placeholder:text-ui-muted/70" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="سورة، رقم صفحة، أو كلمات من آية" aria-label="سورة، رقم صفحة، أو كلمات من آية">
+        <button type="button" class="search-clear" id="search-clear" hidden="" aria-label="مسح"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg></button>
+      </label>
+      <div class="search-results tw:px-4 tw:pb-[max(16px,env(safe-area-inset-bottom))] tw:[scrollbar-width:thin] tw:[scrollbar-color:#a3c7b7_transparent] tw:[&_.result-heading]:m-0 tw:[&_.result-heading]:bg-transparent tw:[&_.result-heading]:px-2 tw:[&_.result-heading]:py-3 tw:[&_.result-heading]:text-xs tw:[&_.result-heading]:font-medium tw:[&_.result-heading]:text-ui-muted tw:[&_.result]:mb-2 tw:[&_.result]:flex tw:[&_.result]:flex-wrap tw:[&_.result]:gap-2 tw:[&_.result]:rounded-2xl tw:[&_.result]:border-0 tw:[&_.result]:bg-white tw:[&_.result]:p-4 tw:[&_.result]:text-start tw:[&_.result]:transition-colors tw:[&_.result:hover]:bg-ui-mint/50 tw:[&_.result:focus-visible]:outline-2 tw:[&_.result:focus-visible]:outline-ui-accent tw:[&_.result-icon]:hidden tw:[&_.result-go]:hidden tw:[&_.result-text]:min-w-0 tw:[&_.result-text]:flex-1 tw:[&_.result-text_b]:text-base tw:[&_.result-text_b]:font-semibold tw:[&_.result-text_b]:text-ui-ink tw:[&_.result-text_small]:mt-1 tw:[&_.result-text_small]:text-xs tw:[&_.result-text_small]:text-ui-muted tw:[&_.taste]:w-full tw:[&_.taste]:flex-auto tw:[&_.taste]:text-start tw:[&_.taste]:leading-8 tw:[&_.taste]:text-ui-ink tw:[&_.taste:empty]:hidden tw:[&_.search-note]:mx-auto tw:[&_.search-note]:mt-6 tw:[&_.search-note]:max-w-xs tw:[&_.search-note]:bg-transparent tw:[&_.search-note]:text-center tw:[&_.search-note]:text-sm tw:[&_.search-note]:leading-7 tw:[&_.search-note]:text-ui-muted tw:[&_.see-all]:min-h-11 tw:[&_.see-all]:rounded-lg tw:[&_.see-all]:px-3 tw:[&_.see-all]:text-ui-accent tw:motion-reduce:[&_.result]:transition-none" id="search-results"></div>
+    </dialog>
+
+    <dialog class="sheet tall tw:h-[min(88dvh,780px)] tw:rounded-t-[28px] tw:bg-ui-surface tw:backdrop:bg-slate-950/35 tw:has-[.mistakes-empty]:h-auto tw:has-[.mistakes-empty]:max-h-[75dvh] tw:has-[.mistakes-empty]:[&_.mistakes-empty]:m-0 tw:has-[.mistakes-empty]:[&_.mistakes-empty]:rounded-none tw:has-[.mistakes-empty]:[&_.mistakes-empty]:bg-transparent tw:has-[.mistakes-empty]:[&_.mistakes-empty]:px-2 tw:has-[.mistakes-empty]:[&_.mistakes-empty]:py-6 tw:has-[.mistakes-empty]:[&_.mistakes-empty_span]:text-base tw:has-[.mistakes-empty]:[&_.mistakes-empty_span]:leading-8 tw:has-[.mistakes-empty]:[&_.mistakes-empty_span]:text-ui-muted" id="mistakes-sheet" aria-labelledby="mistakes-title">
+      <div class="tw:mx-auto tw:mt-2.5 tw:h-1 tw:w-9 tw:shrink-0 tw:rounded-full tw:bg-ui-muted/25" aria-hidden="true"></div>
+      <div class="tw:flex tw:shrink-0 tw:items-center tw:justify-between tw:px-5 tw:py-3">
+        <h2 id="mistakes-title" class="tw:m-0 tw:text-lg tw:font-semibold tw:text-ui-ink">سجل الأخطاء</h2>
+        <button type="button" class="tw:flex tw:size-11 tw:items-center tw:justify-center tw:rounded-full tw:bg-ui-control tw:p-3 tw:text-ui-muted tw:hover:bg-ui-mint tw:focus-visible:outline-2 tw:focus-visible:outline-ui-accent" data-close="" aria-label="إغلاق"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="tw:min-h-0 tw:flex-1 tw:overflow-y-auto tw:overscroll-contain tw:px-4 tw:[scrollbar-width:thin] tw:[scrollbar-color:#a3c7b7_transparent] tw:[&_.mistakes-empty_b]:hidden">
+      <div class="tw:mb-3 tw:rounded-2xl tw:bg-ui-mint/45 tw:p-3 tw:has-[#mistakes-range[hidden]]:hidden">
+        <p class="tw:m-0 tw:text-xs tw:leading-6 tw:text-ui-muted" id="mistakes-range"></p>
+        <p class="tw:mb-0 tw:mt-1 tw:flex tw:flex-wrap tw:gap-2 tw:[&[hidden]]:hidden tw:[&_.count-chip]:rounded-lg tw:[&_.count-chip]:bg-white/80 tw:[&_.count-chip]:px-2 tw:[&_.count-chip]:py-1 tw:[&_.count-chip]:text-xs tw:[&_.count-chip]:font-medium" id="mistakes-counts"></p>
+      </div>
+      <ul class="tw:m-0 tw:list-none tw:p-0 tw:space-y-3 tw:[&_.mistake]:flex tw:[&_.mistake]:w-full tw:[&_.mistake]:flex-col tw:[&_.mistake]:gap-3 tw:[&_.mistake]:rounded-2xl tw:[&_.mistake]:border tw:[&_.mistake]:border-ui-muted/10 tw:[&_.mistake]:bg-white tw:[&_.mistake]:p-4 tw:[&_.mistake]:text-start tw:[&_.mistake:focus-visible]:outline-2 tw:[&_.mistake:focus-visible]:outline-ui-accent tw:[&_.mistake-head]:flex tw:[&_.mistake-head]:flex-wrap tw:[&_.mistake-head]:gap-2 tw:[&_.mistake-ref]:w-full tw:[&_.mistake-ref]:text-xs tw:[&_.mistake-ref]:text-ui-muted tw:[&_.mistake-kind]:text-sm tw:[&_.mistake-kind]:font-semibold tw:[&_.mistake-kind]:text-ui-ink tw:[&_.mistake-corrected]:text-xs tw:[&_.mistake-corrected]:text-ui-accent tw:[&_.mistake-box]:flex tw:[&_.mistake-box]:w-full tw:[&_.mistake-box]:flex-col tw:[&_.mistake-box]:gap-3 tw:[&_.mistake-box]:rounded-xl tw:[&_.mistake-box]:bg-ui-surface tw:[&_.mistake-box]:p-3 tw:[&_.mistake-row]:flex tw:[&_.mistake-row]:flex-col tw:[&_.mistake-row]:items-stretch tw:[&_.mistake-row]:gap-1 tw:[&_.mistake-label]:w-auto tw:[&_.mistake-label]:text-xs tw:[&_.mistake-label]:text-ui-muted tw:[&_.mistake-ayah]:text-2xl tw:[&_.mistake-ayah]:leading-[2] tw:[&_.mistake-detail]:text-sm tw:[&_.mistake-detail]:leading-7 tw:[&_.expected-word]:rounded tw:[&_.expected-word]:bg-ui-mint tw:[&_.expected-word]:text-ui-ink tw:[&_.mistaken]:rounded tw:[&_.mistaken]:bg-amber-100 tw:[&_.mistaken]:text-amber-950 tw:[&_.mistakes-empty]:flex tw:[&_.mistakes-empty]:flex-col tw:[&_.mistakes-empty]:gap-3 tw:[&_.mistakes-empty]:rounded-2xl tw:[&_.mistakes-empty]:bg-white tw:[&_.mistakes-empty]:p-6 tw:[&_.mistakes-empty]:text-center tw:[&_.mistakes-empty]:text-sm tw:[&_.mistakes-empty]:leading-7 tw:[&_.mistakes-empty]:text-ui-muted" id="mistakes-list"></ul>
+      </div>
+      <p class="feedback-notice tw:mx-4 tw:mb-[max(16px,env(safe-area-inset-bottom))] tw:mt-3 tw:shrink-0 tw:rounded-xl tw:border-0 tw:bg-ui-control tw:p-3 tw:text-xs tw:leading-6 tw:text-ui-muted">
+        <span id="notice-icon" hidden></span><span id="mistakes-notice"></span>
+      </p>
+    </dialog>
+
+    <dialog class="sheet" id="layout-sheet" aria-labelledby="layout-title">
+      <div class="sheet-head">
+        <h2 id="layout-title">طريقة عرض المصحف</h2>
+        <button class="icon-btn small" data-close="" aria-label="إغلاق"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg></button>
+      </div>
+      <div class="layouts">
+        <p class="section-label" id="layout-section">طريقة القراءة</p>
+        <p class="section-hint" id="layout-hint">اختر الطريقة التي تودّ أن تقرأ بها القرآن.</p>
+        <div class="choices" role="radiogroup" aria-labelledby="layout-section">
+          <button type="button" class="choice" role="radio" data-layout="book" aria-checked="true">
+            <span class="choice-icon" data-icon="book"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"></path></svg></span>
+            <span class="choice-text"><b id="layout-book">المصحف</b><small id="layout-book-detail">مصحف المدينة (١٤٤١)</small></span>
+            <span class="radio" aria-hidden="true"></span>
+          </button>
+          <button type="button" class="choice" role="radio" data-layout="text" aria-checked="false">
+            <span class="choice-icon" data-icon="text"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path></svg></span>
+            <span class="choice-text"><b id="layout-text">نص القرآن</b><small id="layout-text-detail">نص قرآني يمكن تكبيره وتصغيره</small></span>
+            <span class="radio" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="sheet tw:rounded-t-[28px] tw:border-0 tw:bg-ui-surface tw:shadow-2xl tw:shadow-emerald-950/15 tw:backdrop:bg-slate-950/35 tw:motion-reduce:animate-none" id="settings-sheet" aria-labelledby="settings-title">
+      <div class="tw:mx-auto tw:mt-2.5 tw:h-1 tw:w-9 tw:shrink-0 tw:rounded-full tw:bg-ui-muted/25" aria-hidden="true"></div>
+      <div class="tw:flex tw:items-center tw:justify-between tw:px-5 tw:py-3">
+        <h2 id="settings-title" class="tw:m-0 tw:text-lg tw:font-semibold tw:text-ui-ink">الإعدادات</h2>
+        <button type="button" class="tw:flex tw:size-11 tw:items-center tw:justify-center tw:rounded-full tw:bg-ui-control tw:p-3 tw:text-ui-muted tw:transition-colors tw:hover:bg-ui-mint tw:focus-visible:outline-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none" data-close="" aria-label="إغلاق"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:px-4 tw:pb-[max(24px,env(safe-area-inset-bottom))]">
+        <div class="tw:flex tw:flex-col tw:gap-3 tw:rounded-2xl tw:bg-white tw:p-4 tw:ring-1 tw:ring-ui-muted/10 tw:ring-inset">
+          <span class="tw:text-sm tw:font-semibold tw:text-ui-ink" id="lang-label">اللغة</span>
+          <div class="tw:grid tw:grid-cols-2 tw:gap-1.5 tw:rounded-xl tw:bg-ui-control tw:p-1" role="group" aria-labelledby="lang-label">
+            <button type="button" data-lang="ar" lang="ar" aria-pressed="true" class="tw:min-h-11 tw:rounded-lg tw:px-3 tw:text-sm tw:font-medium tw:text-ui-muted tw:transition-colors tw:aria-pressed:bg-white tw:aria-pressed:text-ui-accent tw:aria-pressed:shadow-sm tw:focus-visible:outline-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none">العربية</button>
+            <button type="button" data-lang="en" lang="en" aria-pressed="false" class="tw:min-h-11 tw:rounded-lg tw:px-3 tw:text-sm tw:font-medium tw:text-ui-muted tw:transition-colors tw:aria-pressed:bg-white tw:aria-pressed:text-ui-accent tw:aria-pressed:shadow-sm tw:focus-visible:outline-2 tw:focus-visible:outline-ui-accent tw:motion-reduce:transition-none">English</button>
+          </div>
+        </div>
+
+      </div>
+    </dialog>
+
+    <div id="model-download" hidden class="tw:fixed tw:inset-0 tw:z-[100] tw:flex tw:items-center tw:justify-center tw:bg-slate-950/15 tw:p-5 tw:[&[hidden]]:hidden">
+      <section role="status" aria-live="polite" aria-labelledby="model-download-title" class="tw:w-full tw:max-w-[300px] tw:rounded-3xl tw:border tw:border-white/70 tw:bg-white/85 tw:p-6 tw:text-center tw:shadow-xl tw:shadow-emerald-950/10 tw:backdrop-blur-xl">
+        <h2 id="model-download-title" class="tw:m-0 tw:text-base tw:font-semibold tw:text-ui-ink"></h2>
+        <p id="model-download-hint" class="tw:mb-5 tw:mt-2 tw:text-xs tw:leading-6 tw:text-ui-muted"></p>
+        <div id="model-download-track" role="progressbar" aria-labelledby="model-download-title" aria-valuemin="0" aria-valuemax="100" class="tw:h-1.5 tw:overflow-hidden tw:rounded-full tw:bg-ui-accent/10">
+          <div id="model-download-fill" class="tw:h-full tw:w-full tw:origin-right tw:scale-x-[var(--model-progress,0)] tw:rounded-full tw:bg-ui-accent tw:ltr:origin-left"></div>
+        </div>
+        <p id="model-download-percent" class="tw:mb-0 tw:mt-3 tw:text-lg tw:font-semibold tw:text-ui-accent tw:tabular-nums"></p>
+      </section>
+    </div>
+<noscript>متتبع التلاوة: اتلُ القرآن، والمصحف يتابعك كلمةً كلمة. This site needs JavaScript.</noscript>
+
+
+</body></html>
