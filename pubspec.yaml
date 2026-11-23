@@ -9,8 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  quran_tarteel:
-    path: ../quran_tarteel
+  quran_tarteel: ^0.1.0
   qvp_flutter:
     git:
       url: https://github.com/Iam-Muslim/quran-engine.git
