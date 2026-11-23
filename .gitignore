@@ -1,0 +1,124 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+**/build/
+/functions/
+.dart_tool/
+**/.dart_tool/
+.wrangler/
+**/.wrangler/
+*.aab
+.kotlin
+
+# ASR Models (never commit to git)
+assets/model/
+**/assets/model/
+*.onnx
+
+# --- iOS Specific Rules ---
+**/dgph
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+**/*sync/
+.sconsign.dblite
+.tags*
+**/.vagrant/
+**/DerivedData/
+Icon?
+!icons/
+!**/icons/
+!**/icons/**
+**/Pods/
+**/.symlinks/
+ios/profile
+ios/xcuserdata
+**/.generated/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/Flutter/flutter_export_environment.sh
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Exceptions to above rules.
+!default.mode1v3
+!default.mode2v3
+!default.pbxuser
+!default.perspectivev3
+
+# Ignore scratch directories
+.scratch/
+/assets/model
+
+# Signing material — never commit
+secrets/
+*.p8
+*.mobileprovision
+*.p12
+ios/ExportOptionsCI.plist.local
+
+# fastlane run artifacts
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/
+ios/secrets/
+ios/.bundle/
+ios/vendor/
+ios/fastlane/report.xml
+ios/fastlane/Preview.html
+ios/fastlane/test_output/
+
+# Windows native binaries
+windows/runner/*.dll
+windows/runner/*.exp
+windows/runner/*.lib
+
+pubspec.lock
+
+test
+.agents
+
+# Recite Quran native sources (built on CI, vendored as binaries)
+packages/recite_quran/native/
+
+# Private offline FFI engine and model weights (Local only; never push to Git)
+offline_engine/

@@ -1,0 +1,32 @@
+Improve your Quran recitation and memorisation.
+
+Whether you are memorising a new surah or revising your daily portion, the app listens as you recite and highlights each word on screen in real time.
+
+It is built on modern on-device AI and runs entirely on your iPhone. No internet connection is needed, so your privacy is complete and you can revise anywhere.
+
+KEY FEATURES
+
+• Real-time word tracking
+Each word turns green when you pronounce it correctly, and red when it is skipped or misread, so you can correct yourself immediately.
+
+• Tajweed and Madd checking
+The app measures the length of your Madd, Ghunnah and Shaddah and marks a word yellow when the timing is off. Tap any word to see the expected duration against the one you recited, in milliseconds.
+
+• Voice ayah search
+Recite any verse aloud and the app jumps straight to it. Nothing to type.
+
+• Hifz revision and hide mode
+Words reveal themselves only as you recite them correctly, so you can test how firmly you have memorised a passage.
+
+• Fully offline, completely private
+Your voice never leaves your device. Everything is processed locally: no account, no tracking, no data usage.
+
+• Smart auto-scroll
+The page follows the pace of your recitation, so you can recite without touching the screen.
+
+• Adjustable display
+Control font size and weight, and pick the theme that reads most comfortably.
+
+The app is entirely free: no adverts, no subscriptions, no in-app purchases.
+
+For the sake of Allah alone.

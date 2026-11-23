@@ -1,0 +1,687 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Recite Quran — اتلو القران : iOS release pipeline
+#
+#   bundle exec fastlane ios_status        # what's on TestFlight / App Store now
+#   bundle exec fastlane make_app          # one-time: how to create the ASC record
+#   bundle exec fastlane make_ci_cert      # one-time / on expiry: CI signing identity
+#   bundle exec fastlane make_profile      # reissue the App Store profile
+#   bundle exec fastlane ship_ios          # bump + build + upload to TestFlight
+#   bundle exec fastlane internal          # latest build → internal testers (instant)
+#   bundle exec fastlane external          # latest build → external testers (Apple review)
+#   bundle exec fastlane release_ios       # latest TestFlight build → App Store review
+#   bundle exec fastlane ci_bundle         # collect the GitHub Actions secrets
+#
+# The Apple identity is shared with the team's other apps, so the App Store
+# Connect API key in secrets/ is used by more than this project.
+#
+# Run with the Homebrew Ruby (fastlane needs Ruby 3+), not macOS's built-in 2.6:
+#   PATH="/opt/homebrew/opt/ruby/bin:$PATH" bundle exec fastlane ...
+# ─────────────────────────────────────────────────────────────────────────────
+
+require "base64"
+require "shellwords"
+require "securerandom"
+
+# Derived, not hardcoded: the checkout path contains a space on this Mac and
+# differs again on CI, so anything shelling out must quote it.
+IOS_DIR    = File.expand_path("..", __dir__)        # <repo>/ios
+ROOT       = File.expand_path("../..", __dir__)     # <repo> root
+TEAM_ID    = "ZKQ5264RUS"
+BUNDLE_ID  = "com.recitequran.app"
+APP_NAME   = "Recite Quran - اتلو القران"
+
+ASC_KEY_ID    = "ZJUS9VF3D6"
+ASC_ISSUER_ID = "2a31803e-fd97-4852-9a5d-0eea1a75b6dd"
+ASC_KEY_PATH  = "#{IOS_DIR}/secrets/AuthKey_#{ASC_KEY_ID}.p8"
+
+GH_REPO            = ENV["GITHUB_REPOSITORY"] || "Recite-Quran/Natlu"
+IOS_INTERNAL_GROUP = "internal"   # team members, no review, instant
+IOS_EXTERNAL_GROUP = "external"   # invited testers, needs Apple beta review
+PROFILE_NAME   = "ReciteQuran AppStore"
+
+# The ASR model is a 69 MB release asset rather than a committed file, so a
+# fresh checkout has to fetch it before any build.
+MODEL_PATH    = "#{ROOT}/assets/model/zipformer_p_arabic_v3.int8.onnx"
+MODEL_RELEASE = "models-latest"
+MODEL_REPO    = "Recite-Quran/Natlu"
+
+def flutter_bin
+  ENV["FLUTTER_BIN"] || `which flutter`.strip.then { |p| p.empty? ? "flutter" : p }
+end
+
+def asc_key
+  UI.user_error!("App Store Connect key missing at #{ASC_KEY_PATH}") unless File.exist?(ASC_KEY_PATH)
+  app_store_connect_api_key(
+    key_id: ASC_KEY_ID,
+    issuer_id: ASC_ISSUER_ID,
+    key_filepath: ASC_KEY_PATH,
+    in_house: false
+  )
+end
+
+def asc_token!
+  Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+    key_id: ASC_KEY_ID, issuer_id: ASC_ISSUER_ID, filepath: ASC_KEY_PATH
+  )
+end
+
+# Build the App Store profile directly instead of going through `sigh`.
+#
+# A provisioning profile embeds the certificates allowed to sign with it, and
+# `sigh` only attaches ones whose private key it can find in the local keychain.
+# The CI certificate's key is deliberately a file rather than a keychain item, so
+# `sigh` leaves it out and the runner's signature is rejected. Talking to the API
+# directly lets every distribution certificate onto the profile — the one on this
+# Mac and the CI one both.
+def reissue_appstore_profile!
+  asc_token!
+
+  bundle = Spaceship::ConnectAPI::BundleId.find(BUNDLE_ID)
+  UI.user_error!("#{BUNDLE_ID} is not registered on the developer portal") if bundle.nil?
+
+  dist_certs = Spaceship::ConnectAPI::Certificate.all.select do |c|
+    c.certificate_type.to_s.include?("DISTRIBUTION")
+  end
+  UI.user_error!("no distribution certificates on the team") if dist_certs.empty?
+  UI.message("attaching #{dist_certs.count} distribution certificate(s):")
+  dist_certs.each { |c| UI.message("  #{c.id}  expires #{c.expiration_date}") }
+
+  # Profile names are unique per team, so the old one has to go first.
+  Spaceship::ConnectAPI::Profile.all.select { |pr| pr.name == PROFILE_NAME }.each do |pr|
+    UI.message("removing the previous '#{PROFILE_NAME}' profile (#{pr.id})")
+    pr.delete!
+  end
+
+  profile = Spaceship::ConnectAPI::Profile.create(
+    name: PROFILE_NAME,
+    profile_type: Spaceship::ConnectAPI::Profile::ProfileType::IOS_APP_STORE,
+    bundle_id_id: bundle.id,
+    certificate_ids: dist_certs.map(&:id)
+  )
+
+  path = "#{IOS_DIR}/secrets/ReciteQuran_appstore.mobileprovision"
+  File.binwrite(path, Base64.decode64(profile.profile_content))
+  UI.success("wrote #{path}")
+  path
+end
+
+def pubspec_path
+  "#{ROOT}/pubspec.yaml"
+end
+
+# pubspec `version: 1.0.2+16` → ["1.0.2", 16]
+def pubspec_version
+  line = File.read(pubspec_path).lines.find { |l| l =~ /^version:\s*/ }
+  UI.user_error!("No `version:` line in pubspec.yaml") if line.nil?
+  name, build = line.sub(/^version:\s*/, "").strip.split("+", 2)
+  [name, (build || "0").to_i]
+end
+
+def set_build(marketing, n)
+  p = pubspec_path
+  File.write(p, File.read(p).sub(/^version:.*$/, "version: #{marketing}+#{n}"))
+  UI.message("pubspec → #{marketing}+#{n}")
+end
+
+# The highest build number Apple has seen, whatever state it is in.
+#
+# Deliberately not `latest_testflight_build_number`: that reports 0 even when a
+# VALID build exists, which would hand out a number already in use. Expired and
+# still-processing builds count too — Apple rejects a repeat regardless.
+def max_testflight_build
+  asc_token!
+  app = Spaceship::ConnectAPI::App.find(BUNDLE_ID)
+  return 0 if app.nil?
+  app.get_builds.map { |b| b.version.to_i }.max || 0
+rescue => e
+  UI.important("TestFlight lookup failed (#{e.message[0..60]}) — treating as 0")
+  0
+end
+
+# One monotonic build number: 1 + max(what TestFlight already has, what pubspec
+# says). Apple rejects a re-used build number at the very end of an upload, long
+# after the archive is built, so it is worth getting right up front.
+def next_build
+  tf = max_testflight_build
+  local = pubspec_version[1]
+  nxt = [tf, local].max + 1
+  UI.message("build numbers — TestFlight:#{tf}  pubspec:#{local}  → next:#{nxt}")
+  nxt
+end
+
+# Apple also rejects a marketing version that has already been used, and again
+# only at submission time. Advisory on lookup failure: a Spaceship hiccup must
+# not block an otherwise-fine release, only a *confirmed* collision stops us.
+def assert_version_unused(marketing)
+  used = begin
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id: ASC_KEY_ID, issuer_id: ASC_ISSUER_ID, filepath: ASC_KEY_PATH
+    )
+    app = Spaceship::ConnectAPI::App.find(BUNDLE_ID)
+    app.nil? ? [] : app.get_app_store_versions.map { |v| [v.version_string, v.app_store_state] }
+  rescue => e
+    UI.important("Could not check existing App Store versions (#{e.message[0..80]}) — continuing")
+    nil
+  end
+  return if used.nil?
+
+  hit = used.find { |vs, _| vs == marketing }
+  if hit
+    UI.user_error!(
+      "#{marketing} already exists on App Store Connect (state: #{hit[1]}).\n" \
+      "Bump `version:` in pubspec.yaml before building.\n" \
+      "Versions in use: #{used.map(&:first).join(', ')}"
+    )
+  end
+  UI.success("#{marketing} is not yet on App Store Connect — proceeding.")
+end
+
+def ensure_model!
+  return if File.exist?(MODEL_PATH) && File.size(MODEL_PATH) > 1_000_000
+
+  UI.message("ASR model missing — fetching from #{MODEL_REPO} release #{MODEL_RELEASE}")
+  FileUtils.mkdir_p(File.dirname(MODEL_PATH))
+  sh("gh release download #{MODEL_RELEASE} --repo #{MODEL_REPO} -p '*.onnx' " \
+     "--dir #{ROOT.shellescape}/assets/model --clobber")
+  UI.user_error!("Model still missing at #{MODEL_PATH}") unless File.exist?(MODEL_PATH)
+end
+
+# `flutter build` shells out to `pod install`, and getting CocoaPods to work in
+# that subprocess needs opposite treatment on a laptop and on a runner.
+#
+# Locally: fastlane runs under the Homebrew Ruby, whose gem vars leak into the
+# subprocess and confuse the *system* `pod` → "CocoaPods is installed but
+# broken" → the build aborts. Stripping the bundler/gem vars fixes it.
+#
+# On CI: `bundle exec` points GEM_HOME at the vendored bundle and puts its
+# binstubs on PATH, so `pod` resolves to the CocoaPods gem in the Gemfile.
+# Scrubbing the environment there breaks the very thing that makes it work, so
+# the ambient environment is left alone.
+def flutter_sh(args)
+  flutter = flutter_bin
+  prefix =
+    if ENV["CI"]
+      ""
+    else
+      "env -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH -u BUNDLER_VERSION -u GEM_HOME " \
+      "-u GEM_PATH -u GEM_ROOT -u RUBYOPT -u RUBYLIB " \
+      "PATH='/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:#{File.dirname(flutter)}:/opt/homebrew/bin' " \
+      "LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 "
+    end
+  sh("cd #{ROOT.shellescape} && #{prefix}#{flutter.shellescape} #{args}")
+end
+
+def build_ios(marketing, n, export_plist: "ios/ExportOptions.plist")
+  ensure_model!
+
+  flutter_sh("build ipa --release --build-name=#{marketing} --build-number=#{n} " \
+             "--export-options-plist=#{export_plist}")
+
+  ipa = Dir["#{ROOT}/build/ios/ipa/*.ipa"].max_by { |f| File.mtime(f) }
+  UI.user_error!("No IPA in build/ios/ipa/ — check Xcode signing") if ipa.nil?
+  ipa
+end
+
+# ── Release lanes ────────────────────────────────────────────────────────────
+
+desc "Show what is currently on TestFlight / App Store"
+lane :ios_status do
+  marketing, build = pubspec_version
+  tf = (latest_testflight_build_number(
+          api_key: asc_key, app_identifier: BUNDLE_ID, initial_build_number: 0
+        ) rescue "n/a")
+  UI.success("pubspec = #{marketing}+#{build}   TestFlight latest build = #{tf}")
+  UI.message("model present: #{File.exist?(MODEL_PATH)}")
+end
+
+desc "iOS: bump build number, build, upload to TestFlight"
+lane :ship_ios do
+  marketing, = pubspec_version
+  assert_version_unused(marketing)
+  n = next_build
+  set_build(marketing, n)
+  ipa = build_ios(marketing, n)
+  upload_to_testflight(
+    api_key: asc_key, app_identifier: BUNDLE_ID, ipa: ipa,
+    skip_submission: true, skip_waiting_for_build_processing: true
+  )
+  UI.success("✅ #{marketing} build #{n} → TestFlight (processing).")
+  UI.success("   Once Apple finishes processing: bundle exec fastlane beta")
+end
+
+desc "Re-upload an already-built IPA to TestFlight (no rebuild)"
+lane :retry_upload_ios do |o|
+  UI.user_error!("Pass ipa:/path/to.ipa") if o[:ipa].nil?
+  upload_to_testflight(
+    api_key: asc_key, app_identifier: BUNDLE_ID, ipa: o[:ipa],
+    skip_submission: true, skip_waiting_for_build_processing: true
+  )
+end
+
+# Hand the newest processed build to one TestFlight group.
+#
+# The two kinds behave very differently, which is why they are separate lanes
+# rather than one with a name argument:
+#
+#   internal — team members on the App Store Connect account, up to 100. The
+#              build is available the moment Apple finishes processing it, with
+#              no review of any kind.
+#   external — anyone you invite, up to 10,000, but the *first* build a group
+#              sees has to clear Apple's beta review first, which usually takes
+#              a day or so.
+# The newest build Apple has finished processing, as [version, build].
+#
+# `latest_testflight_build_number` reports 0 here even with a VALID build on
+# TestFlight, so the build is located through the API directly. Both numbers are
+# needed: pilot matches a build by version *and* build number, and a build that
+# is still PROCESSING cannot be distributed at all.
+def latest_processed_build
+  asc_token!
+  app = Spaceship::ConnectAPI::App.find(BUNDLE_ID)
+  UI.user_error!("#{BUNDLE_ID} not found on App Store Connect") if app.nil?
+
+  build = app.get_builds(includes: "preReleaseVersion")
+             .reject(&:expired)
+             .select { |b| b.processing_state == "VALID" }
+             .max_by { |b| b.version.to_i }
+
+  UI.user_error!("No processed build on TestFlight yet — run ship_ios first") if build.nil?
+  [build.pre_release_version&.version, build.version]
+end
+
+def distribute_to(group_name, external:)
+  key = asc_key
+  asc_token!
+
+  app = Spaceship::ConnectAPI::App.find(BUNDLE_ID)
+  group = app.get_beta_groups.find { |g| g.name == group_name }
+  if group.nil?
+    have = app.get_beta_groups.map(&:name).join(", ")
+    UI.user_error!("No TestFlight group called '#{group_name}'. Groups on this app: #{have}")
+  end
+
+  version, build = latest_processed_build
+
+  # A group set to "automatically distribute builds" already has every build the
+  # moment Apple finishes processing it, and the API rejects a manual assignment
+  # outright — "Cannot add internal group to a build". That is the default for
+  # internal groups, so treat it as success rather than an error.
+  if group.has_access_to_all_builds
+    UI.success("'#{group_name}' receives every build automatically — #{version} build #{build} is already there.")
+    return build
+  end
+
+  UI.message("distributing #{version} build #{build} to '#{group_name}'")
+  upload_to_testflight(
+    api_key: key,
+    app_identifier: BUNDLE_ID,
+    # Without this pilot stops to ask "appletvos, ios, osx, xros" on stdin,
+    # which on a runner just hangs until the job times out.
+    app_platform: "ios",
+    distribute_only: true,
+    distribute_external: external,
+    groups: [group_name],
+    # Only external testers get an email; internal testers see it immediately.
+    notify_external_testers: external,
+    app_version: version,
+    build_number: build,
+    changelog: (File.read("#{METADATA_DIR}/en-US/release_notes.txt").strip rescue nil)
+  )
+  build
+end
+
+desc "Send the latest build to the 'internal' TestFlight group (no review)"
+lane :internal do
+  n = distribute_to(IOS_INTERNAL_GROUP, external: false)
+  UI.success("✅ build #{n} → '#{IOS_INTERNAL_GROUP}' — available to the team now.")
+end
+
+desc "Send the latest build to the 'external' TestFlight group (Apple beta review)"
+lane :external do
+  n = distribute_to(IOS_EXTERNAL_GROUP, external: true)
+  UI.success("✅ build #{n} → '#{IOS_EXTERNAL_GROUP}' — pending Apple beta review.")
+end
+
+desc "Alias for `external`, kept so older notes and tags still work"
+lane :beta do
+  external
+end
+
+METADATA_DIR = "#{__dir__}/metadata"
+
+# The metadata scaffold ships with TODO placeholders. Uploading those to Apple
+# would put them on the public listing, so refuse while any remain and name the
+# files that still need filling.
+def assert_metadata_filled!
+  pending = Dir.glob("#{METADATA_DIR}/**/*.txt").select do |f|
+    File.read(f).lstrip.start_with?("TODO")
+  end
+  return if pending.empty?
+
+  UI.user_error!(
+    "#{pending.count} metadata file(s) still contain placeholder text:\n" +
+    pending.map { |f| "  ios/fastlane/metadata/#{f.sub("#{METADATA_DIR}/", '')}" }.sort.join("\n") +
+    "\n\nFill them in, then run this lane again."
+  )
+end
+
+desc "Submit the latest TestFlight build to App Store review"
+lane :release_ios do
+  key = asc_key
+  assert_metadata_filled!
+  marketing, = pubspec_version
+  n = latest_testflight_build_number(api_key: key, app_identifier: BUNDLE_ID, initial_build_number: 0)
+  UI.user_error!("No processed build on TestFlight yet — run ship_ios first") if n.to_i.zero?
+
+  # Ensure whatsNew (release notes) is patched directly on App Store Connect via the API before submission
+  asc_token!
+  app = Spaceship::ConnectAPI::App.find(BUNDLE_ID)
+  edit_version = app&.get_edit_app_store_version(includes: "appStoreVersionLocalizations")
+  if edit_version
+    localizations = edit_version.app_store_version_localizations || []
+    localizations.each do |loc|
+      notes_file = "#{METADATA_DIR}/#{loc.locale}/release_notes.txt"
+      if File.exist?(notes_file)
+        notes = File.read(notes_file).strip
+        unless notes.empty?
+          UI.message("Patching whatsNew for #{loc.locale} via App Store Connect API...")
+          begin
+            Spaceship::ConnectAPI.patch_app_store_version_localization(
+              app_store_version_localization_id: loc.id,
+              attributes: { whatsNew: notes }
+            )
+          rescue => e
+            UI.important("Could not patch #{loc.locale} whatsNew via API: #{e.message}")
+          end
+        end
+      end
+    end
+  end
+
+  release_notes_ar = File.exist?("#{METADATA_DIR}/ar-SA/release_notes.txt") ? File.read("#{METADATA_DIR}/ar-SA/release_notes.txt").strip : ""
+  release_notes_en = File.exist?("#{METADATA_DIR}/en-US/release_notes.txt") ? File.read("#{METADATA_DIR}/en-US/release_notes.txt").strip : ""
+
+  # Screenshots are deliberately not managed from here: Apple requires them for
+  # submission, but they are easier to curate in App Store Connect than to keep
+  # in the repo. Add them there before submitting.
+  upload_to_app_store(
+    api_key: key,
+    app_identifier: BUNDLE_ID,
+    app_version: marketing,
+    build_number: n.to_s,
+    platform: "ios",
+    metadata_path: METADATA_DIR,
+    release_notes: {
+      "ar-SA" => release_notes_ar,
+      "en-US" => release_notes_en,
+      "default" => release_notes_ar
+    },
+    skip_binary_upload: true,
+    skip_screenshots: true,
+    overwrite_screenshots: false,
+    sync_screenshots: false,
+    submit_for_review: true,
+    automatic_release: true,
+    reject_if_possible: true,
+    force: true,
+    precheck_include_in_app_purchases: false,
+    submission_information: {
+      add_id_info_uses_idfa: false,
+      export_compliance_uses_encryption: false,
+      content_rights_contains_third_party_content: false
+    }
+  )
+  UI.success("✅ #{marketing} (build #{n}) → App Store review, auto-release on approval.")
+end
+
+# ── One-time setup ───────────────────────────────────────────────────────────
+
+desc "Explain how to create the App Store Connect record (cannot be automated)"
+# There is no scripted path for this. fastlane's `produce` only supports Apple ID
+# + password authentication -- it predates App Store Connect API keys -- and
+# Apple's API has no create-an-app endpoint at all. Rather than fail with
+# `No value found for 'username'`, say what to do.
+lane :make_app do
+  exists = begin
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id: ASC_KEY_ID, issuer_id: ASC_ISSUER_ID, filepath: ASC_KEY_PATH
+    )
+    !Spaceship::ConnectAPI::App.find(BUNDLE_ID).nil?
+  rescue => e
+    UI.important("Could not query App Store Connect (#{e.message[0..60]})")
+    nil
+  end
+
+  if exists
+    UI.success("#{BUNDLE_ID} already exists on App Store Connect — nothing to do.")
+    next
+  end
+
+  UI.important("Create the listing by hand at https://appstoreconnect.apple.com/apps")
+  UI.important("  Apps → + → New App")
+  UI.important("  Platform:  iOS")
+  UI.important("  Bundle ID: #{BUNDLE_ID}")
+  UI.important("  Name:      #{APP_NAME}")
+  UI.important("  Language:  Arabic")
+  UI.important("  SKU:       #{BUNDLE_ID}")
+  UI.message("")
+  UI.message("The bundle ID itself is already registered on the developer portal,")
+  UI.message("so `make_profile` and signing work without this. Only the TestFlight")
+  UI.message("and App Store uploads need the listing to exist.")
+end
+
+desc "Reissue the App Store provisioning profile and install it locally"
+# Deliberately does NOT call `cert`. Certificates are minted only by
+# `make_ci_cert`, which knows about Apple's per-team cap; nothing here should be
+# able to create one as a side effect.
+lane :make_profile do
+  asc_key
+  path = reissue_appstore_profile!
+  # Installing it locally is what lets Xcode and `ship_ios` sign on this Mac.
+  FileUtils.mkdir_p(File.expand_path("~/Library/MobileDevice/Provisioning Profiles"))
+  uuid = `security cms -D -i #{path.shellescape} | plutil -extract UUID raw -o - -`.strip
+  FileUtils.cp(path, File.expand_path("~/Library/MobileDevice/Provisioning Profiles/#{uuid}.mobileprovision"))
+  UI.success("Profile written to secrets/ and installed as #{uuid}.")
+end
+
+desc "Install the four GitHub Actions secrets (upload:true), or write them out"
+# `upload: true` pushes them straight to the repository with `gh`, so nobody
+# needs a browser. GitHub requires **admin** on the repo to write secrets --
+# write access is not enough -- so whoever runs it needs that.
+#
+# Without upload: they go to a gitignored file instead, to add by hand.
+lane :ci_bundle do |o|
+  p12      = "#{CI_CERT_DIR}/ReciteQuran_ci_dist.p12"
+  pass_txt = "#{CI_CERT_DIR}/p12_password.txt"
+  profile  = "#{IOS_DIR}/secrets/ReciteQuran_appstore.mobileprovision"
+
+  [p12, pass_txt, profile].each do |f|
+    UI.user_error!("Missing #{f} — run `fastlane make_ci_cert` first") unless File.exist?(f)
+  end
+
+  values = {
+    "IOS_DIST_CERT_P12"        => Base64.strict_encode64(File.binread(p12)),
+    "IOS_DIST_CERT_PASSWORD"   => File.read(pass_txt).strip,
+    "IOS_PROVISIONING_PROFILE" => Base64.strict_encode64(File.binread(profile)),
+    "ASC_KEY_P8"               => Base64.strict_encode64(File.binread(ASC_KEY_PATH))
+  }
+
+  if o[:upload]
+    values.each do |name, value|
+      # Fed to `gh` on stdin so the value never appears in a command line, a
+      # process list or the fastlane log.
+      IO.popen(["gh", "secret", "set", name, "--repo", GH_REPO], "w") { |io| io.write(value) }
+      UI.user_error!("Failed to set #{name} — do you have admin on #{GH_REPO}?") unless $?.success?
+      UI.success("set #{name}")
+    end
+    UI.success("All four secrets are on #{GH_REPO}.")
+  else
+    out = "#{IOS_DIR}/secrets/ci_secrets.txt"
+    File.open(out, "w", 0600) { |f| values.each { |k, v| f.puts("#{k}=#{v}"); f.puts } }
+    UI.success("Wrote #{out} (mode 0600, gitignored).")
+    UI.important("Re-run as `fastlane ci_bundle upload:true` to install them with `gh`,")
+    UI.important("or add them by hand under Settings -> Secrets and variables -> Actions.")
+  end
+end
+
+# ── CI (GitHub Actions) ──────────────────────────────────────────────────────
+
+# The runner has no Xcode account signed in, so automatic signing cannot resolve
+# a profile. The workflow imports the distribution certificate into a temporary
+# keychain and drops the profile in place; this lane points the Runner target at
+# them explicitly, then exports with ios/ExportOptionsCI.plist.
+#
+# The project file is edited in the runner's working copy only — never committed.
+desc "CI: build signed and upload to TestFlight (GitHub Actions)"
+lane :ci_ship_ios do
+  UI.user_error!("ci_ship_ios is for CI; use ship_ios locally") unless ENV["CI"]
+
+  marketing, = pubspec_version
+  n = next_build
+  set_build(marketing, n)
+
+  update_code_signing_settings(
+    path: "#{IOS_DIR}/Runner.xcodeproj",
+    use_automatic_signing: false,
+    team_id: TEAM_ID,
+    targets: ["Runner"],
+    bundle_identifier: BUNDLE_ID,
+    code_sign_identity: "Apple Distribution",
+    profile_name: PROFILE_NAME
+  )
+
+  ipa = build_ios(marketing, n, export_plist: "ios/ExportOptionsCI.plist")
+
+  upload_to_testflight(
+    api_key: asc_key, app_identifier: BUNDLE_ID, ipa: ipa,
+    skip_submission: true, skip_waiting_for_build_processing: true
+  )
+  UI.success("✅ #{marketing} build #{n} → TestFlight from CI.")
+end
+
+desc "CI: build unsigned only (no secrets needed) — compile check"
+lane :ci_build_unsigned do
+  ensure_model!
+  flutter_sh("build ipa --release --no-codesign")
+  UI.success("✅ Unsigned archive built.")
+end
+
+# ── CI signing identity ──────────────────────────────────────────────────────
+
+CI_KEYCHAIN = "#{Dir.home}/Library/Keychains/recitequran-ci.keychain-db"
+CI_CERT_DIR = "#{IOS_DIR}/secrets/ci"
+
+desc "Mint a CI-only Apple Distribution certificate (no keychain prompt)"
+# Xcode does manage certificates for you, but only in one direction. Apple never
+# holds your private key -- it only ever signs the public half -- so there is no
+# way to fetch the key back down. The key behind the team's existing certificate
+# lives in the login keychain guarded by a per-item ACL, and exporting it always
+# raises a GUI prompt: fine once by hand, useless from a script.
+#
+# So instead of extracting that key, mint a *second* certificate whose key we
+# generate ourselves and keep as a file. Nothing touches the login keychain and
+# the lane can be re-run whenever the certificate expires.
+#
+# The existing certificate that the team's other apps sign with is left
+# completely alone. Adding a certificate does not affect it; only revoking would.
+lane :make_ci_cert do |o|
+  key = asc_key
+  asc_token!
+
+  FileUtils.mkdir_p(CI_CERT_DIR)
+  cer = Dir["#{CI_CERT_DIR}/*.cer"].max_by { |f| File.mtime(f) }
+
+  if cer && File.exist?(cer.sub(/\.cer\z/, ".p12"))
+    # A previous run already minted one. Reuse it rather than spend another of
+    # the team's limited certificate slots; delete secrets/ci to start over.
+    UI.important("Reusing the certificate already in #{CI_CERT_DIR} (#{File.basename(cer, '.cer')}).")
+    UI.important("Delete that directory first if you really want a new one.")
+  else
+    # Apple caps distribution certificates per team, and `force` below mints a
+    # new one on every run. Refuse once there are already two, so a stray re-run
+    # cannot quietly burn the team's last slot.
+    existing = Spaceship::ConnectAPI::Certificate.all.select do |c|
+      c.certificate_type.to_s.include?("DISTRIBUTION")
+    end
+    UI.message("distribution certificates on the team: #{existing.count}")
+    existing.each { |c| UI.message("  #{c.display_name}  id=#{c.id}  expires #{c.expiration_date}") }
+
+    if existing.count >= 2 && !o[:force]
+      UI.user_error!(
+        "The team already has #{existing.count} distribution certificates and Apple caps how many " \
+        "you may hold.\nIf one of them is a stale CI certificate, revoke that one in the developer " \
+        "portal first.\nRe-run with force:true only if you are sure there is room."
+      )
+    end
+
+    # A throwaway keychain, so the import never goes near the login keychain.
+    # It has to join the user search list while `cert` runs, though: `cert`
+    # confirms its work by looking the certificate up, and that lookup only
+    # consults the search list -- outside it the lane dies with
+    # "Could not find the newly generated certificate installed".
+    kc_pass  = SecureRandom.hex(12)
+    original = `security list-keychains -d user`.scan(/"([^"]+)"/).flatten
+
+    begin
+      sh("security delete-keychain #{CI_KEYCHAIN.shellescape} 2>/dev/null || true")
+      sh("security create-keychain -p #{kc_pass.shellescape} #{CI_KEYCHAIN.shellescape}")
+      sh("security unlock-keychain -p #{kc_pass.shellescape} #{CI_KEYCHAIN.shellescape}")
+      sh("security set-keychain-settings -t 3600 -l #{CI_KEYCHAIN.shellescape}")
+      sh("security list-keychains -d user -s #{CI_KEYCHAIN.shellescape} " +
+         original.map(&:shellescape).join(" "))
+
+      cert(
+        api_key: key,
+        team_id: TEAM_ID,
+        generate_apple_certs: true,
+        force: true,
+        platform: "ios",
+        output_path: CI_CERT_DIR,
+        keychain_path: CI_KEYCHAIN,
+        keychain_password: kc_pass
+      )
+    ensure
+      # Put the machine back exactly as it was, even if `cert` raised.
+      sh("security list-keychains -d user -s " + original.map(&:shellescape).join(" ")) unless original.empty?
+      sh("security delete-keychain #{CI_KEYCHAIN.shellescape} 2>/dev/null || true")
+    end
+
+    cer = Dir["#{CI_CERT_DIR}/*.cer"].max_by { |f| File.mtime(f) }
+  end
+
+  UI.user_error!("no .cer in #{CI_CERT_DIR}") if cer.nil?
+
+  # `cert` writes the private key as PEM but gives it a .p12 extension -- a
+  # long-standing fastlane quirk, it is not a PKCS#12 bundle. Pair it with the
+  # certificate to build a real one that `security import` will accept.
+  pem_key = cer.sub(/\.cer\z/, ".p12")
+  UI.user_error!("no private key beside #{cer}") unless File.exist?(pem_key)
+
+  cert_pem = "#{CI_CERT_DIR}/cert.pem"
+  p12_out  = "#{CI_CERT_DIR}/ReciteQuran_ci_dist.p12"
+  p12_pass = SecureRandom.hex(16)
+
+  # LibreSSL at /usr/bin/openssl, not Homebrew's OpenSSL 3: its PKCS#12 defaults
+  # are the ones macOS and the runner's `security import` read without complaint.
+  sh("/usr/bin/openssl x509 -inform DER -in #{cer.shellescape} -out #{cert_pem.shellescape}")
+  # Password through the environment so it stays out of the logged command line.
+  ENV["CI_P12_PASSWORD"] = p12_pass
+  sh("/usr/bin/openssl pkcs12 -export -inkey #{pem_key.shellescape} -in #{cert_pem.shellescape} " \
+     "-out #{p12_out.shellescape} -passout env:CI_P12_PASSWORD")
+  File.chmod(0600, p12_out)
+
+  # Prove it round-trips before anyone pastes it into a GitHub secret.
+  sh("/usr/bin/openssl pkcs12 -in #{p12_out.shellescape} -passin env:CI_P12_PASSWORD -nokeys -noout")
+  ENV.delete("CI_P12_PASSWORD")
+
+  # The profile predates this certificate, so reissue it with both attached.
+  reissue_appstore_profile!
+
+  File.write("#{CI_CERT_DIR}/p12_password.txt", p12_pass + "\n")
+  File.chmod(0600, "#{CI_CERT_DIR}/p12_password.txt")
+
+  UI.success("CI certificate ready:")
+  UI.success("  #{p12_out}")
+  UI.success("  password in #{CI_CERT_DIR}/p12_password.txt")
+  UI.important("Now run `bundle exec fastlane ci_bundle` to emit the GitHub secrets.")
+end

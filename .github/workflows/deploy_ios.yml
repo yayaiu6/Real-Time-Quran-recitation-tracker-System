@@ -1,0 +1,267 @@
+# Signed iOS releases straight from GitHub — no Mac required on the operator's
+# side. Everything runs on GitHub's macOS runners, which are free for public
+# repositories, so a Windows machine can ship to TestFlight and the App Store
+# with nothing but git.
+#
+# Two ways to start a release:
+#
+#   1. Push a tag — works from any machine with git, and needs nothing else:
+#
+#        git tag ios-testflight-1.2.1 && git push origin ios-testflight-1.2.1
+#
+#      The tag is  ios-<action>-<version>.  <action> is one of:
+#
+#        unsigned    compile only, no secrets needed
+#        testflight  build a signed IPA and upload it
+#        internal    hand the last build to the internal testers, no review
+#        external    hand it to the external testers, needs Apple beta review
+#        appstore    submit the last build to App Store review
+#
+#      <version>, when it is exactly N.N or N.N.N, is used as the marketing
+#      version; anything else (ios-unsigned-1) is just a label so the tag is
+#      unique. A two-part version is padded to three -- 1.0 becomes 1.0.0 --
+#      because Apple accepts 1.0 but a Dart pubspec does not.
+#
+#   2. The Run workflow button on the Actions tab, if you prefer it.
+#
+# Tags are the documented path because they do not depend on GitHub having
+# indexed this file for manual dispatch — see ios/docs/IOS_DEPLOYMENT.md.
+
+
+name: 06 - Deploy iOS (signed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do"
+        type: choice
+        default: testflight
+        options:
+          - testflight   # build a signed IPA and upload it to TestFlight
+          - internal     # last build → internal testers, available immediately
+          - external     # last build → external testers, needs Apple beta review
+          - appstore     # submit the last TestFlight build to App Store review
+          - unsigned     # compile only, no secrets needed (a smoke test)
+      marketing_version:
+        description: "Marketing version, e.g. 1.2.1 (blank keeps pubspec's value)"
+        required: false
+        type: string
+  push:
+    tags:
+      - 'ios-unsigned-*'
+      - 'ios-testflight-*'
+      - 'ios-internal-*'
+      - 'ios-external-*'
+      - 'ios-beta-*'       # kept as an alias for external
+      - 'ios-appstore-*'
+
+# Two concurrent uploads would race for the same TestFlight build number.
+concurrency:
+  group: ios-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    env:
+      FLUTTER_VERSION: "3.44.8"
+      MODEL_RELEASE: models-latest
+      MODEL_REPO: Recite-Quran/Natlu
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # A tag push and a manual dispatch carry the same two settings in
+      # different places. Normalise them here so every later step reads one
+      # source.
+      - name: Resolve action and version
+        id: cfg
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            tag="${GITHUB_REF_NAME}"
+            rest="${tag#ios-}"
+            action="${rest%%-*}"
+            version="${rest#*-}"
+            # The trailing part is only a version if it is exactly N.N or N.N.N;
+            # in a tag like ios-unsigned-1 it is just there to keep the tag
+            # unique. The match has to be strict, because Apple rejects anything
+            # else as a marketing version and only says so at the very end of an
+            # upload -- a tag such as ios-testflight-1.0.3-rc1 would otherwise
+            # sail through here and waste a full build.
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+              version=""
+            fi
+          else
+            action="${{ github.event.inputs.action }}"
+            version="${{ github.event.inputs.marketing_version }}"
+          fi
+
+          # `beta` is the old name for `external`; accept it and normalise.
+          [ "$action" = "beta" ] && action="external"
+
+          case "$action" in
+            unsigned|testflight|internal|external|appstore) ;;
+            *) echo "::error::Unknown action '$action'. Expected unsigned, testflight, internal, external or appstore." >&2; exit 1 ;;
+          esac
+
+          # Apple is happy with a two-part marketing version like 1.0, but a Dart
+          # pubspec is not: `version: 1.0+16` fails to parse and takes the build
+          # down at `flutter pub get`. Pad it to three parts, and say so rather
+          # than changing the version behind your back.
+          if [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "::notice::padding version $version to ${version}.0 — a pubspec needs three components"
+            version="${version}.0"
+          fi
+
+          echo "action=$action"   >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "::notice::action=$action version=${version:-<from pubspec>}"
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Set up Ruby and fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: ios
+
+      # The 69 MB ASR model is published as a release asset rather than
+      # committed, so every fresh checkout has to fetch it before building.
+      - name: Download ASR model
+        if: steps.cfg.outputs.action == 'testflight' || steps.cfg.outputs.action == 'unsigned'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p assets/model
+          gh release download "$MODEL_RELEASE" --repo "$MODEL_REPO" -p '*.onnx' --dir assets/model --clobber
+          ls -lh assets/model
+
+      - name: Apply marketing version override
+        if: steps.cfg.outputs.version != ''
+        run: |
+          set -euo pipefail
+          current=$(grep '^version:' pubspec.yaml | sed 's/^version:[[:space:]]*//')
+          build="${current#*+}"
+          new="${{ steps.cfg.outputs.version }}+${build}"
+
+          # Check before writing: an unparseable version does not surface until
+          # `flutter pub get`, by which point the failure reads like a broken
+          # dependency rather than a bad tag.
+          if [[ ! "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]+[+][0-9]+$ ]]; then
+            echo "::error::Refusing to write 'version: $new' — a pubspec needs major.minor.patch+build." >&2
+            exit 1
+          fi
+
+          sed -i '' "s/^version:.*/version: ${new}/" pubspec.yaml
+          grep '^version:' pubspec.yaml
+
+      - name: Install Flutter packages
+        run: flutter pub get
+
+      # --- signing material: only for the lanes that actually talk to Apple ---
+
+      - name: Import distribution certificate
+        if: steps.cfg.outputs.action == 'testflight'
+        uses: apple-actions/import-codesign-certs@v7
+        with:
+          p12-file-base64: ${{ secrets.IOS_DIST_CERT_P12 }}
+          p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+
+      - name: Install provisioning profile
+        if: steps.cfg.outputs.action == 'testflight'
+        env:
+          PROFILE_B64: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          set -euo pipefail
+          dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$dir"
+          echo "$PROFILE_B64" | base64 --decode > "$dir/ReciteQuran_appstore.mobileprovision"
+          # Xcode matches profiles by UUID on disk, not by filename.
+          uuid=$(security cms -D -i "$dir/ReciteQuran_appstore.mobileprovision" \
+                 | plutil -extract UUID raw -o - -)
+          mv "$dir/ReciteQuran_appstore.mobileprovision" "$dir/$uuid.mobileprovision"
+          echo "installed profile $uuid"
+
+      - name: Write App Store Connect API key
+        if: steps.cfg.outputs.action != 'unsigned'
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          mkdir -p ios/secrets
+          echo "$ASC_KEY_P8" | base64 --decode > ios/secrets/AuthKey_ZJUS9VF3D6.p8
+          chmod 600 ios/secrets/AuthKey_ZJUS9VF3D6.p8
+
+      # --- the actual work (delegated to ios/ directory) ---
+
+      - name: Build and upload to TestFlight
+        if: steps.cfg.outputs.action == 'testflight'
+        working-directory: ios
+        run: bundle exec fastlane ci_ship_ios
+
+      - name: Distribute to internal testers
+        if: steps.cfg.outputs.action == 'internal'
+        working-directory: ios
+        run: bundle exec fastlane internal
+
+      - name: Distribute to external testers
+        if: steps.cfg.outputs.action == 'external'
+        working-directory: ios
+        run: bundle exec fastlane external
+
+      - name: Submit to App Store review
+        if: steps.cfg.outputs.action == 'appstore'
+        working-directory: ios
+        run: bundle exec fastlane release_ios
+
+      - name: Build unsigned (smoke test)
+        if: steps.cfg.outputs.action == 'unsigned'
+        working-directory: ios
+        run: bundle exec fastlane ci_build_unsigned
+
+      # --- artefacts ---
+
+      - name: Upload IPA
+        if: steps.cfg.outputs.action == 'testflight'
+        uses: actions/upload-artifact@v7
+        with:
+          name: recite-quran-ios-ipa
+          path: build/ios/ipa/*.ipa
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload fastlane logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fastlane-logs
+          path: |
+            ~/Library/Logs/gym/
+            ~/Library/Logs/fastlane/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Clean up secrets
+        if: always()
+        run: rm -rf ios/secrets
+

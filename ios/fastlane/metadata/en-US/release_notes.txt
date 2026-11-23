@@ -1,0 +1,3 @@
+What's new in this version:
+• Offline Audio Download: Download Quran recitation audio for offline playback with word-by-word highlighting.
+• Performance improvements and bug fixes.

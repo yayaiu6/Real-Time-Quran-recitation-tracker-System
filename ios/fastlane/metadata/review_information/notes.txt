@@ -1,0 +1,39 @@
+WHAT THE APP DOES
+
+Recite Quran is a practice tool for people memorising and reciting the Quran. It listens through the microphone while the user recites aloud and highlights each word on screen as it is recognised: green when pronounced correctly, red when a word is skipped or misread, and yellow when Tajweed timing (Madd, Ghunnah, Shaddah) is outside the accepted range. Tapping a word shows expected vs. recited duration in milliseconds.
+
+Target audience: students of Quranic memorisation (hifz) and anyone revising recitation. It is a private practice aid, not a religious authority, reporting measured timing without ruling on recitation validity.
+
+HOW TO TEST IT
+
+No account, login, or credentials needed. No paid content, subscriptions, in-app purchases, ads, or user-generated content.
+
+1. Launch app and allow microphone access.
+2. Select any surah from the list.
+3. Tap the microphone button and recite verses aloud.
+4. Words highlight in real time: green (correct), red (skipped/misread), yellow (Tajweed timing). Tap yellow/red words for details.
+
+NOTE FOR REVIEWER: The app only responds to recited Quranic Arabic (the on-device model is trained exclusively on it). If you do not recite Arabic, you can test it completely by playing a recording of the chosen verses aloud from a second device held near the iPhone.
+
+EXTERNAL SERVICES USED
+
+- Recitation Audio: Public domain verse recordings (Mahmoud Khalil Al-Husary) streamed/cached on-demand from everyayah.com for playback.
+- Speech recognition (100% on-device): Zipformer CTC acoustic model bundled locally via ONNX Runtime (CoreML). No audio ever leaves the device.
+- Privacy: No user tracking, no authentication, no user accounts, no analytics or ads SDKs. Microphone audio is processed strictly in memory, never written to disk or transmitted over the network.
+
+REGIONAL DIFFERENCES
+
+None. Identical globally. UI follows device language (Arabic or English).
+
+THIRD-PARTY MATERIAL AND LICENSING
+
+All bundled third-party assets permit free distribution:
+
+1. Quranic typeface: KFGQPC Hafs Smart (King Fahd Glorious Quran Printing Complex). Embedded unmodified under its free-use license.
+2. Acoustic model: Quran-Lab zipformer_p-arabic-v3 (Quran-Lab No-Profit License 1.2), permitted for free, non-monetised software.
+3. Text & phonetics: Derived from open-source quran-transcript and Quranic Universal Aligner projects.
+Open source repository: github.com/Iam-Muslim/Natlu
+
+PERMISSIONS
+
+Microphone only: requested upon starting recitation practice to recognize recited words. No other data collected.

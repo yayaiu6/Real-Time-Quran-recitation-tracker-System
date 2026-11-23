@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "Recite Quran";
+"CFBundleName" = "Recite Quran";
+"NSMicrophoneUsageDescription" = "This app requires microphone access to listen to your recitation and track your Tajweed in real-time.";
+"NSCameraUsageDescription" = "Camera access is used for video participation in collaborative recitation circles.";

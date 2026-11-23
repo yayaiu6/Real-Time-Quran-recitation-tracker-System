@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="استمع وتتبع تلاوة القرآن الكريم بالذكاء الاصطناعي على جهازك بدون إنترنت.">
+  <meta name="theme-color" content="#059669">
+
+  <!-- Mobile / iOS meta & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="اتلو القران">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <!-- Open Graph / Facebook / WhatsApp -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://natlu.pages.dev/">
+  <meta property="og:site_name" content="Natlu — Recite Quran">
+  <meta property="og:title" content="Natlu Web — Real-Time Quran Recitation Tracker">
+  <meta property="og:description"
+    content="Recite Quran directly in your browser with real-time word tracking, acoustic Tajweed checking, and hands-free voice search. 100% on-device and free.">
+  <meta property="og:image" content="https://natlu.pages.dev/icons/Icon-512.png">
+  <meta property="og:image:secure_url" content="https://natlu.pages.dev/icons/Icon-512.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Natlu Web — Real-Time Quran Recitation Tracker">
+  <meta name="twitter:description"
+    content="Recite Quran directly in your browser with real-time word tracking, acoustic Tajweed checking, and hands-free voice search. 100% on-device and free.">
+  <meta name="twitter:image" content="https://natlu.pages.dev/icons/Icon-512.png">
+  <link rel="image_src" href="https://natlu.pages.dev/icons/Icon-512.png">
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" href="icons/favicon.png?v=quran" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/Icon-192.png?v=quran" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/Icon-512.png?v=quran" />
+
+  <title>Recite Quran - اتلو القران</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Preload critical Web bootstrap & font resources -->
+  <link rel="preload" href="flutter_bootstrap.js" as="script">
+  <link rel="preload" href="assets/assets/fonts/Cairo-Regular.ttf" as="font" type="font/ttf" crossorigin>
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #fdfaf6;
+      overflow: hidden;
+    }
+
+    /* PWA Banner */
+    .pwa-banner {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 420px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      border-radius: 1rem;
+      padding: 0.85rem 1rem;
+      z-index: 10000;
+      direction: rtl;
+    }
+
+    .pwa-banner-content {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .pwa-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 0.5rem;
+    }
+
+    .pwa-text {
+      flex: 1;
+    }
+
+    .pwa-title-ar {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .pwa-subtitle {
+      font-size: 0.75rem;
+      color: #4b5563;
+      margin-top: 0.1rem;
+    }
+
+    .pwa-subtitle-en {
+      font-size: 0.68rem;
+      color: #9ca3af;
+      direction: ltr;
+      text-align: right;
+    }
+
+    .pwa-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .pwa-btn {
+      background: #059669;
+      color: #ffffff;
+      border: none;
+      padding: 0.4rem 0.85rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    .pwa-close-btn {
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 0.25rem;
+    }
+  </style>
+
+  <script>
+    // Prevent browser history navigation on horizontal touchpad swipes
+    window.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) e.preventDefault();
+    }, { passive: false });
+
+    // Self-contained Setup Engine (IIFE prevents any global identifier clashes)
+    (function () {
+      const PAGES_DB_NAME = 'MushafPagesDB';
+      const PAGES_STORE_NAME = 'pages';
+
+      // 1. Guard against third-party wakelock_plus web concurrency bug in no_sleep.js
+      if (typeof navigator !== 'undefined' && navigator.wakeLock && navigator.wakeLock.request) {
+        const _origWakeLock = navigator.wakeLock.request.bind(navigator.wakeLock);
+        let _pendingLock = null;
+        navigator.wakeLock.request = function (type) {
+          if (_pendingLock) return _pendingLock;
+          _pendingLock = _origWakeLock(type).catch(function () { return null; }).finally(function () { _pendingLock = null; });
+          return _pendingLock;
+        };
+      }
+
+      // 2. Flutter Web Bootstrapper
+      if (!window.registerAppServiceWorker && 'serviceWorker' in navigator) {
+        window.registerAppServiceWorker = function () {
+          navigator.serviceWorker.register('sw.js')
+            .then((reg) => { if (navigator.onLine) reg.update().catch(() => {}); })
+            .catch((err) => console.warn('[PWA] ServiceWorker error:', err));
+        };
+      }
+
+      window.bootFlutterApp = function () {
+        if (window._flutterBootStarted) return;
+        window._flutterBootStarted = true;
+        if (typeof window.registerAppServiceWorker === 'function') {
+          window.registerAppServiceWorker();
+        }
+        const s = document.createElement('script');
+        s.src = 'flutter_bootstrap.js';
+        s.async = true;
+        (document.head || document.documentElement).appendChild(s);
+      };
+
+      // 3. IndexedDB Helpers for Decoded Mushaf Vector Pages (Singleton Connection)
+      let _pagesDbPromise = null;
+      function openPagesDB() {
+        if (_pagesDbPromise) return _pagesDbPromise;
+        _pagesDbPromise = new Promise((resolve, reject) => {
+          const req = indexedDB.open(PAGES_DB_NAME, 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(PAGES_STORE_NAME)) db.createObjectStore(PAGES_STORE_NAME);
+          };
+          req.onsuccess = (e) => {
+            const db = e.target.result;
+            db.onversionchange = () => { db.close(); _pagesDbPromise = null; };
+            db.onclose = () => { _pagesDbPromise = null; };
+            resolve(db);
+          };
+          req.onerror = (e) => {
+            _pagesDbPromise = null;
+            reject(e.target.error);
+          };
+        });
+        return _pagesDbPromise;
+      }
+
+      window.hasCachedPages = async function () {
+        try {
+          const db = await openPagesDB();
+          return new Promise((resolve) => {
+            const tx = db.transaction(PAGES_STORE_NAME, 'readonly');
+            const req = tx.objectStore(PAGES_STORE_NAME).count();
+            req.onsuccess = () => resolve(req.result >= 605);
+            req.onerror = () => resolve(false);
+          });
+        } catch (_) {
+          return false;
+        }
+      };
+
+      window.getPageFromDB = async function (key) {
+        try {
+          const db = await openPagesDB();
+          return new Promise((resolve) => {
+            const tx = db.transaction(PAGES_STORE_NAME, 'readonly');
+            const req = tx.objectStore(PAGES_STORE_NAME).get(String(key));
+            req.onsuccess = () => {
+              if (!req.result) return resolve(null);
+              if (req.result instanceof Uint8Array) return resolve(req.result);
+              if (req.result instanceof ArrayBuffer) return resolve(new Uint8Array(req.result));
+              return resolve(new Uint8Array(req.result.buffer || req.result));
+            };
+            req.onerror = () => resolve(null);
+          });
+        } catch (_) {
+          return null;
+        }
+      };
+
+      window.saveMushafPageToDB = async function (key, bytes) {
+        try {
+          const db = await openPagesDB();
+          const tx = db.transaction(PAGES_STORE_NAME, 'readwrite');
+          tx.objectStore(PAGES_STORE_NAME).put(bytes, String(key));
+        } catch (_) { }
+      };
+
+      window.saveMushafPagesBatchToDB = async function (batch) {
+        try {
+          const db = await openPagesDB();
+          return new Promise((resolve) => {
+            const tx = db.transaction(PAGES_STORE_NAME, 'readwrite');
+            const store = tx.objectStore(PAGES_STORE_NAME);
+            for (const key of Object.keys(batch)) {
+              store.put(batch[key], String(key));
+            }
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+          });
+        } catch (_) {
+          return false;
+        }
+      };
+
+      // 5. High-Performance On-Demand Asset Fetcher (with multi-tier fallback for Firefox/AdBlock/ISP blocks)
+      window.fetchPageAsset = async function (url) {
+        const file = url.includes('/') ? url.split('/').pop() : url;
+        const targets = [url, '/api/qvp?file=' + encodeURIComponent(file)];
+        for (const target of targets) {
+          try {
+            const res = await fetch(target, { mode: 'cors' });
+            const type = res.headers.get('content-type') || '';
+            if (res.ok && !type.includes('text/html')) {
+              return new Uint8Array(await res.arrayBuffer());
+            }
+          } catch (_) { }
+        }
+        console.warn('[QVP Web] Failed to fetch on-demand asset:', url);
+        return null;
+      };
+
+      // Instant Boot: Start Flutter immediately on page load with zero splash or loading screen
+      window.bootFlutterApp();
+      window.hideAppSplash = function () { };
+
+      window.clearAppCacheAndReload = async function () {
+        try {
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const reg of regs) await reg.unregister();
+          }
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            for (const k of keys) await caches.delete(k);
+          }
+        } catch (_) { }
+        window.location.reload(true);
+      };
+    })();
+  </script>
+</head>
+
+<body>
+  <!-- Chromium / Android PWA Install Banner -->
+  <div id="pwa-install-banner" class="pwa-banner" style="display: none;">
+    <div class="pwa-banner-content">
+      <img src="icons/Icon-192.png" alt="App Icon" class="pwa-icon" />
+      <div class="pwa-text">
+        <div class="pwa-title-ar">أضف التطبيق للشاشة الرئيسية</div>
+        <div class="pwa-subtitle">للاستخدام السريع وبدون إنترنت في أي وقت</div>
+        <div class="pwa-subtitle-en">Add to Home Screen for quick offline access</div>
+      </div>
+      <div class="pwa-actions">
+        <button id="pwa-install-btn" class="pwa-btn">إضافة • Add</button>
+        <button id="pwa-close-btn" class="pwa-close-btn" aria-label="Close">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- iOS Safari PWA Guided Banner -->
+  <div id="pwa-ios-banner" class="pwa-banner" style="display: none;">
+    <div class="pwa-banner-content">
+      <img src="icons/Icon-192.png" alt="App Icon" class="pwa-icon" />
+      <div class="pwa-text">
+        <div class="pwa-title-ar">أضف التطبيق للشاشة الرئيسية</div>
+        <div class="pwa-subtitle">
+          اضغط على زر المشاركة
+          <svg viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2" stroke-linecap="round"
+            stroke-linejoin="round" style="width: 1.1em; height: 1.1em; vertical-align: -0.2em; display: inline-block;">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+            <polyline points="16 6 12 2 8 6"></polyline>
+            <line x1="12" y1="2" x2="12" y2="15"></line>
+          </svg>
+          ثم اختر <strong>"إضافة إلى الصفحة الرئيسية"</strong>
+        </div>
+        <div class="pwa-subtitle-en">
+          Tap Share below, then select <strong>"Add to Home Screen"</strong>
+        </div>
+      </div>
+      <div class="pwa-actions">
+        <button id="pwa-ios-close-btn" class="pwa-close-btn" aria-label="Close">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/pwa_install.js" defer></script>
+  <script src="js/qvp.js" defer></script>
+  <script src="assets/packages/quran_tajweedformer/assets/web/tajweedformer_web.js" defer></script>
+  <script src="js/sherpa-onnx-asr.js" defer></script>
+  <script src="js/sherpa_official_app.js" defer></script>
+</body>
+
+</html>

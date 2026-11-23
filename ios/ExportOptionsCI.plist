@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- GitHub Actions runners have no Xcode account signed in, so automatic
+	     signing cannot resolve a profile. The workflow imports the distribution
+	     certificate and the App Store profile, then exports against them by name. -->
+	<key>method</key>
+	<string>app-store</string>
+	<key>teamID</key>
+	<string>ZKQ5264RUS</string>
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.recitequran.app</key>
+		<string>ReciteQuran AppStore</string>
+	</dict>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>destination</key>
+	<string>export</string>
+</dict>
+</plist>

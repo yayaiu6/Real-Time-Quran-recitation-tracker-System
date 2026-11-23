@@ -1,0 +1,1 @@
+The app listens as you recite, correcting your words and your Tajweed as you go. Fully offline: your voice never leaves your device.

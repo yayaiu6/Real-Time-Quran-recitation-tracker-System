@@ -1,0 +1,57 @@
+name: Deploy Natlu to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - Natlu-الحمدلله
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Build & Deploy
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify Cloudflare Token
+        env:
+          TOKEN: ${{ secrets.SUBHAN_ALLAH || secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::SUBHAN_ALLAH secret is missing or empty! Go to GitHub repo -> Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Build Web App
+        env:
+          SUBHAN_ALLAH: ${{ secrets.SUBHAN_ALLAH }}
+        run: |
+          chmod +x web/scripts/build.sh
+          bash web/scripts/build.sh
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.SUBHAN_ALLAH || secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 2aeefaef3564273a570980d9f70af9dc
+        run: |
+          # Ensure Cloudflare Pages designated production branch is set to 'main' so deployments update natlu.pages.dev
+          curl -s -X PATCH \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/natlu" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"production_branch": "main"}' || true
+
+          npx --yes wrangler pages deploy build/web --project-name=natlu --branch=main --commit-dirty=true
