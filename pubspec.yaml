@@ -10,9 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   quran_tarteel:
-    git:
-      url: https://github.com/Iam-Muslim/quran-tarteel.git
-      ref: main
+    path: ../quran_tarteel
   qvp_flutter:
     git:
       url: https://github.com/Iam-Muslim/quran-engine.git

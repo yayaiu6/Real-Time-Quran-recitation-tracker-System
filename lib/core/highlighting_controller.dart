@@ -230,17 +230,17 @@ class HighlightingController extends ChangeNotifier {
   // Manual selection state
   int _manualTargetSurah = 0;
 
-  // ── One-Time Scoped (Page-Limited) Auto-Anchor ──
-  late final rq.ScopedAutoAnchor _pageAnchor =
-      rq.ScopedAutoAnchor(repository: repository);
+  // ── One-Time Page Auto-Anchor State ──
+  bool _isAwaitingInitialPageAnchor = false;
 
   /// Whether the controller is actively waiting for initial recitation to anchor.
-  bool get isPageReanchorWaiting => _pageAnchor.isArmed;
+  bool get isPageReanchorWaiting => _isAwaitingInitialPageAnchor;
 
   /// Cancels any pending auto-reanchor waiting state.
   void cancelPageAutoReanchor() {
-    if (_pageAnchor.isArmed) {
-      _pageAnchor.disarm();
+    if (_isAwaitingInitialPageAnchor) {
+      _isAwaitingInitialPageAnchor = false;
+      _scorer.updateConfig(config);
       globalRevision.value++;
       notifyListeners();
     }
@@ -250,39 +250,7 @@ class HighlightingController extends ChangeNotifier {
   void updatePageReanchorTarget({
     int? pageNumber,
     List<(int surah, int ayah)>? pageAyahs,
-  }) {
-    if (!_pageAnchor.isArmed) return;
-    if (pageAyahs != null && pageAyahs.isNotEmpty) {
-      _pageAnchor.arm(pageNumber: pageNumber, ayahs: pageAyahs);
-    }
-  }
-
-  void _executePageAnchor(rq.AutoReanchorEvent event) {
-    if (targetSurah != event.surah) {
-      _manualTargetSurah = event.surah;
-      _scorer.setTargetSurah(
-        event.surah,
-        startGlobalWord: event.newWordIndex,
-        forceClear: true,
-      );
-    } else {
-      _scorer.jumpToWord(event.newWordIndex);
-    }
-
-    activeAyah.value = event.ayah;
-    onAyahChanged?.call();
-    onAutoSavePosition?.call(event.surah, event.ayah);
-    AppState.instance.saveLastPosition(event.surah, event.ayah);
-
-    // Clear highlights forward from this newly anchored ayah
-    clearHighlightsForwardFrom(event.surah, event.ayah);
-
-    _onEngineAutoReanchored(event);
-
-    _scorer.resetBuffer();
-    globalRevision.value++;
-    notifyListeners();
-  }
+  }) {}
 
   // ── Retarget window ──
   //
@@ -343,20 +311,6 @@ class HighlightingController extends ChangeNotifier {
         debugRecognizedText.value = result.text;
       }
 
-      // [ONE-TIME PAGE-LIMITED AUTO-REANCHOR]
-      if (_pageAnchor.isArmed) {
-        final event = _pageAnchor.probe(
-          result.text,
-          isFinal: result.isFinal,
-          activeAyahHint: activeAyah.value,
-        );
-        if (event == null) {
-          return; // Still waiting for user's recitation to anchor on page
-        }
-        _pageAnchor.disarm();
-        _executePageAnchor(event);
-      }
-
       _scorer.feedTranscript(result);
     });
   }
@@ -367,7 +321,10 @@ class HighlightingController extends ChangeNotifier {
   }
 
   void reset() {
-    _pageAnchor.disarm();
+    if (_isAwaitingInitialPageAnchor) {
+      _isAwaitingInitialPageAnchor = false;
+      _scorer.updateConfig(config);
+    }
     _engine.resetBuffer();
     _scorer.resetBuffer();
     debugRecognizedText.value = '';
@@ -377,7 +334,10 @@ class HighlightingController extends ChangeNotifier {
   }
 
   void finalize({bool resetEngine = true}) {
-    _pageAnchor.disarm();
+    if (_isAwaitingInitialPageAnchor) {
+      _isAwaitingInitialPageAnchor = false;
+      _scorer.updateConfig(config);
+    }
     if (resetEngine) {
       _engine.resetBuffer();
     }
@@ -406,23 +366,33 @@ class HighlightingController extends ChangeNotifier {
     List<(int surah, int ayah)>? pageAyahs,
   }) {
     if (pageAyahs != null && pageAyahs.isNotEmpty) {
-      _pageAnchor.arm(pageNumber: pageNumber, ayahs: pageAyahs);
+      _isAwaitingInitialPageAnchor = true;
+      final currentSurah = targetSurah;
+      final currentAyah = activeAyah.value;
+      final bool alreadyOnPage = currentAyah != null &&
+          pageAyahs.any((p) => p.$1 == currentSurah && p.$2 == currentAyah);
+      if (!alreadyOnPage) {
+        final first = pageAyahs.first;
+        setManualAyah(first.$1, first.$2);
+      }
+      // Instant recovery mode: set stall threshold to 0 so the very first uttered words
+      // immediately re-anchor to whichever ayah on the page the reciter starts reading!
+      _scorer.updateConfig(config.copyWith(
+        enableAutoReanchor: true,
+        reanchorStallThreshold: 0,
+      ));
     } else {
-      _pageAnchor.disarm();
-      resumeTracking();
-      return;
+      _isAwaitingInitialPageAnchor = false;
+      _scorer.updateConfig(config);
     }
-
-    _engine.resetBuffer();
-    _scorer.resetBuffer();
-    debugRecognizedText.value = '';
-    globalRevision.value++;
-    notifyListeners();
+    resumeTracking();
   }
 
   void updateConfig(rq.TrackerConfig newConfig) {
     config = newConfig;
-    _scorer.updateConfig(newConfig);
+    if (!_isAwaitingInitialPageAnchor) {
+      _scorer.updateConfig(newConfig);
+    }
   }
 
   /// Current active Tajweed check toggles.
@@ -477,6 +447,12 @@ class HighlightingController extends ChangeNotifier {
     final int ayah = event.ayah;
     if (surah == 0 || ayah == 0) return;
 
+    if (_isAwaitingInitialPageAnchor) {
+      _isAwaitingInitialPageAnchor = false;
+      // Restore normal configured stall threshold
+      _scorer.updateConfig(config);
+    }
+
     if (activeAyah.value != ayah || targetSurah != surah) {
       if (targetSurah != surah) {
         _manualTargetSurah = surah;
@@ -485,6 +461,7 @@ class HighlightingController extends ChangeNotifier {
       onAyahChanged?.call();
       onAutoSavePosition?.call(surah, ayah);
       AppState.instance.saveLastPosition(surah, ayah);
+      clearHighlightsForwardFrom(surah, ayah);
       globalRevision.value++;
       notifyListeners();
     }
@@ -493,6 +470,10 @@ class HighlightingController extends ChangeNotifier {
   /// Pure reactive ingestion of word evaluations directly from the engine isolate.
   void _onEngineWordEvaluated(rq.WordMatchedEvent event) {
     if (_isRetargeting) return;
+    if (_isAwaitingInitialPageAnchor) {
+      _isAwaitingInitialPageAnchor = false;
+      _scorer.updateConfig(config);
+    }
     final int surah = event.surah > 0 ? event.surah : targetSurah;
     final int ayah = event.ayah;
     final int w0 = event.wordInAyah;
@@ -690,7 +671,6 @@ class HighlightingController extends ChangeNotifier {
   }
 
   void setManualAyah(int surah, int ayah) {
-    _pageAnchor.disarm();
     // Local fields are the authoritative coordinate for every reader from
     // this moment on.
     _manualTargetSurah = surah;
@@ -899,7 +879,7 @@ class HighlightingController extends ChangeNotifier {
     required int totalWords,
     bool isRecording = false,
   }) {
-    if (_pageAnchor.isArmed) {
+    if (_isAwaitingInitialPageAnchor) {
       return null;
     }
     if (activeAyah.value != ayah ||
