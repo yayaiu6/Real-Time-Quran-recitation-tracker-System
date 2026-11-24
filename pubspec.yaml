@@ -10,11 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   quran_tarteel: ^0.1.0
-  qvp_flutter:
-    git:
-      url: https://github.com/Iam-Muslim/quran-engine.git
-      ref: fix/flutter-performance-and-parity
-      path: packages/flutter/qvp_flutter
+  qvp_flutter: ^0.11.0
   url_launcher: ^6.3.2
 
   flutter_displaymode: ^0.7.0
