@@ -199,9 +199,10 @@ class ErrorDetailDialog extends StatelessWidget {
     bool isDark, {
     required bool isCompact,
   }) {
-    final expected = e.expectedPh.isEmpty ? '—' : _cleanPhonetic(e.expectedPh);
+    final expected =
+        e.expectedPh.isEmpty ? '—' : _cleanPhonetic(e.expectedPh, isAr);
     final predicted =
-        e.predictedPh.isEmpty ? '—' : _cleanPhonetic(e.predictedPh);
+        e.predictedPh.isEmpty ? '—' : _cleanPhonetic(e.predictedPh, isAr);
     final bool isDurationErr =
         e.expectedDuration != null && e.actualDuration != null;
 
@@ -874,10 +875,45 @@ class ErrorDetailDialog extends StatelessWidget {
   // ──────────────────────────────────────────────────────────────────────────
   // Phonetic Sanitizer Helper
   // ──────────────────────────────────────────────────────────────────────────
-  static String _cleanPhonetic(String input) {
+  static String _cleanPhonetic(String input, [bool isAr = true]) {
     if (input.isEmpty) return input;
+    final s = input.trim();
 
-    String cleaned = input
+    // Direct token mapping (tokens.txt)
+    switch (s) {
+      case 'a':
+        return isAr ? 'فتحة' : 'Fathah';
+      case 'i':
+        return isAr ? 'كسرة' : 'Kasrah';
+      case 'u':
+        return isAr ? 'ضمة' : 'Dammah';
+      case 'aa':
+        return isAr ? 'ا' : 'Alif';
+      case 'ii':
+        return isAr ? 'ي' : 'Yaa';
+      case 'uu':
+        return isAr ? 'و' : 'Waaw';
+      case 'ں':
+        return isAr ? 'غنة' : 'Ghunnah';
+    }
+
+    // Consonant + short vowel (e.g. ba -> بَ, bi -> بِ, bu -> بُ)
+    if (s.length == 2) {
+      final c = s[0], v = s[1];
+      if (v == 'a') return '$c\u064E';
+      if (v == 'i') return '$c\u0650';
+      if (v == 'u') return '$c\u064F';
+    }
+
+    // Consonant + madd (e.g. baa -> با, bii -> بي, buu -> بو)
+    if (s.length == 3) {
+      final c = s[0], m = s.substring(1);
+      if (m == 'aa') return '$c\u0627';
+      if (m == 'ii') return '$c\u064A';
+      if (m == 'uu') return '$c\u0648';
+    }
+
+    String cleaned = s
         .replaceAll('\u06e5', 'و')
         .replaceAll('\u06e6', 'ي')
         .replaceAll('\u06ba', 'ن')
